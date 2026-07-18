@@ -8,7 +8,7 @@
 <div class="favorite-strip">
     {% for row in favorite_rows %}
     <div class="favorite-chip" style="--dot-color: {{ row.station.color }}">
-        <span class="chip-time">{{ row.show.start_time.strftime('%a %H:%M') }}</span>
+        <span class="chip-time">{{ row.weekday_short }} {{ row.show.start_time.strftime('%H:%M') }}</span>
         <span class="chip-dj">{{ row.dj.name if row.dj else 'Unbekannt' }}</span>
         <span class="chip-station">{{ row.station.name }}</span>
     </div>
