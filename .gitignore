@@ -6,4 +6,5 @@ data/*.db-journal
 .env
 .pytest_cache/
 .ruff_cache/
+.coverage
 *.egg-info/
