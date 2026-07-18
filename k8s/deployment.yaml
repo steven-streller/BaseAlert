@@ -15,6 +15,14 @@ spec:
       labels:
         app: basealert
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        # Makes the PVC group-writable for GID 1000 on mount - the image's
+        # own UID/GID 1000 user (see Dockerfile) is otherwise not guaranteed
+        # to own whatever Longhorn/local-path hands back.
+        fsGroup: 1000
       # Only needed if the ghcr.io/<owner>/basealert package is private:
       #   kubectl create secret docker-registry ghcr-creds -n basealert \
       #     --docker-server=ghcr.io --docker-username=<gh-user> --docker-password=<gh-pat>
