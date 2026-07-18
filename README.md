@@ -80,6 +80,12 @@ im Leerlauf ~70 MB RAM, kurze CPU-Spitzen nur während eines Scrape-Laufs.
   `kubectl port-forward -n basealert svc/basealert 8000:8000` nutzen, oder
   [k8s/ingress.yaml](k8s/ingress.yaml) mit echtem Hostnamen ausfüllen und separat
   anwenden (`kubectl apply -f k8s/ingress.yaml`) – k3s bringt dafür Traefik mit.
+- **Non-root**: Das Image läuft als `appuser` (UID/GID 1000), passend zu
+  `securityContext.runAsUser: 1000` + `fsGroup: 1000` in
+  [k8s/deployment.yaml](k8s/deployment.yaml). Bei einem eigenen Deployment-Manifest
+  (nicht über `kubectl apply -k k8s/`) muss `fsGroup: 1000` dort ebenfalls gesetzt
+  sein, sonst ist die PVC nicht beschreibbar bzw. zeigt UID 1000 als
+  "I have no name!" ohne passenden `/etc/passwd`-Eintrag.
 
 ## Entwicklung
 
