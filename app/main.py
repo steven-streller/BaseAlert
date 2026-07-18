@@ -136,6 +136,7 @@ def logout(request: Request):
 # --- Dashboard ----------------------------------------------------------------
 
 WEEKDAYS_DE = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
+WEEKDAY_SHORT_LABELS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
 
 
 def _day_label(day, today) -> str:
@@ -159,6 +160,7 @@ def _enrich(session: Session, shows: list[Show], favorite_dj_ids: set[int], toda
             "dj": djs.get(show.dj_id),
             "station": stations.get(show.station_id),
             "is_favorite": show.dj_id in favorite_dj_ids,
+            "weekday_short": WEEKDAY_SHORT_LABELS[show.start_time.weekday()],
         }
         if today is not None:
             row["day_label"] = _day_label(show.start_time.date(), today)
@@ -296,8 +298,6 @@ def toggle_favorite(request: Request, dj_id: int, current_user: User = Depends(r
 
 
 # --- Listening windows ---------------------------------------------------------
-
-WEEKDAY_SHORT_LABELS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
 
 
 @app.get("/windows")
