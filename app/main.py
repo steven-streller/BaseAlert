@@ -1,7 +1,7 @@
 import logging
 import os
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import RedirectResponse
@@ -12,7 +12,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.auth import get_current_user, login_user, logout_user, require_user
 from app.db import engine, get_setting, get_user_setting, init_db, set_setting, set_user_setting
-from app.models import Dj, Favorite, Show, Station, User
+from app.models import Dj, Favorite, ListeningWindow, Show, Station, User
 from app.notifications import CHANNELS, send_to_channel
 from app.scheduler import reschedule_scrape_job, start_scheduler
 from app.scraper import scrape_all
@@ -281,6 +281,8 @@ def toggle_favorite(request: Request, dj_id: int, current_user: User = Depends(r
 
 # --- Settings -----------------------------------------------------------------
 
+WEEKDAY_SHORT_LABELS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
+
 # checkbox settings keys that are absent from form data when unchecked
 CHANNEL_CHECKBOX_FIELDS = {
     field[0] for channel in CHANNELS.values() for field in channel["fields"] if field[2] == "checkbox"
@@ -301,9 +303,14 @@ def settings_page(
         settings["notify_lead_minutes"] = get_user_setting(session, current_user.id, "notify_lead_minutes")
         for key in list(CHANNEL_CHECKBOX_FIELDS) + [f"{c}_enabled" for c in CHANNELS] + CHANNEL_TEXT_KEYS:
             settings[key] = get_user_setting(session, current_user.id, key)
+        listening_windows = session.exec(
+            select(ListeningWindow).where(ListeningWindow.user_id == current_user.id)
+        ).all()
 
     flash = None
-    if saved:
+    if saved == "windows":
+        flash = "Zeitfenster aktualisiert."
+    elif saved:
         label = CHANNELS[saved]["label"] if saved in CHANNELS else "Allgemein"
         flash = f"„{label}“ gespeichert."
     elif tested == "ok":
@@ -321,6 +328,8 @@ def settings_page(
             "current_user": current_user,
             "settings": settings,
             "channels": CHANNELS,
+            "listening_windows": listening_windows,
+            "weekday_labels": WEEKDAY_SHORT_LABELS,
             "flash": flash,
         },
     )
@@ -349,6 +358,47 @@ async def save_settings(request: Request, current_user: User = Depends(require_u
                     set_user_setting(session, current_user.id, key, str(form.get(key, "")).strip())
 
     return RedirectResponse(url=f"/settings?saved={section}#{section}", status_code=303)
+
+
+@app.post("/settings/windows")
+async def create_listening_window(request: Request, current_user: User = Depends(require_user)):
+    form = await request.form()
+    weekdays = form.getlist("weekdays")
+    start_raw = str(form.get("start_time", ""))
+    end_raw = str(form.get("end_time", ""))
+    label = str(form.get("label", "")).strip() or None
+
+    if not weekdays or not start_raw or not end_raw:
+        return RedirectResponse(url="/settings?saved=windows#windows", status_code=303)
+
+    start_time = time.fromisoformat(start_raw)
+    end_time = time.fromisoformat(end_raw)
+    if start_time >= end_time:
+        return RedirectResponse(url="/settings?saved=windows#windows", status_code=303)
+
+    with Session(engine) as session:
+        session.add(
+            ListeningWindow(
+                user_id=current_user.id,
+                label=label,
+                weekdays=",".join(sorted(weekdays)),
+                start_time=start_time,
+                end_time=end_time,
+            )
+        )
+        session.commit()
+
+    return RedirectResponse(url="/settings?saved=windows#windows", status_code=303)
+
+
+@app.post("/settings/windows/{window_id}/delete")
+def delete_listening_window(window_id: int, current_user: User = Depends(require_user)):
+    with Session(engine) as session:
+        window = session.get(ListeningWindow, window_id)
+        if window and window.user_id == current_user.id:
+            session.delete(window)
+            session.commit()
+    return RedirectResponse(url="/settings?saved=windows#windows", status_code=303)
 
 
 @app.post("/settings/test/{channel}")

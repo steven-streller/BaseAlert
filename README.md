@@ -33,6 +33,11 @@ Registrierung ist offen – jeder mit Zugriff auf die URL kann sich einen Accoun
   Jeder Kanal hat einen eigenen "Testen"-Button, der mit dem zuletzt gespeicherten
   Stand dieses Kanals eine Testbenachrichtigung schickt.
 
+  Zusätzlich lassen sich in den Einstellungen **Zeitfenster** anlegen (Wochentage +
+  Uhrzeit, z.B. "Mo-Fr 15:00-17:00"). Startet in so einem Fenster irgendeine Show,
+  wird benachrichtigt – egal ob der DJ favorisiert ist. Praktisch für Zeiten, in
+  denen dir jeder Live-DJ lieber ist als die automatische Playlist.
+
 Beim ersten Start wird sofort einmal gescraped; danach läuft es automatisch im
 eingestellten Intervall. Die SQLite-Datenbank liegt in `./data/basealert.db`.
 
