@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, time
 from typing import Optional
 
 from sqlmodel import Field, SQLModel, UniqueConstraint
@@ -72,3 +72,20 @@ class UserSetting(SQLModel, table=True):
     user_id: int = Field(foreign_key="user.id", index=True)
     key: str = Field(index=True)
     value: str
+
+
+class ListeningWindow(SQLModel, table=True):
+    """A recurring weekly time window in which the user wants to be notified
+    about ANY live show, not just ones by favorited DJs - e.g. "I'm driving
+    home Mon-Fri 15:00-17:00 and would rather listen to a live DJ than a
+    playlist, whoever it is"."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    label: Optional[str] = None
+    weekdays: str  # comma-separated ints, Monday=0 .. Sunday=6, e.g. "0,1,2,3,4"
+    start_time: time
+    end_time: time
+
+    def weekday_set(self) -> set[int]:
+        return {int(d) for d in self.weekdays.split(",") if d}
