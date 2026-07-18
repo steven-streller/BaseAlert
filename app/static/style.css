@@ -272,6 +272,7 @@ form.settings-form label {
 }
 
 form.settings-form input[type=text],
+form.settings-form input[type=email],
 form.settings-form input[type=password],
 form.settings-form input[type=number] {
     background: var(--bg);
