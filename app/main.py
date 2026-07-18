@@ -31,6 +31,11 @@ class _HealthCheckLogFilter(logging.Filter):
 
 logging.getLogger("uvicorn.access").addFilter(_HealthCheckLogFilter())
 
+# APScheduler logs "Running job ..." / "... executed successfully" at INFO
+# for every single run - with notify_check_job firing every minute that's
+# two log lines a minute forever. Failures still come through at ERROR.
+logging.getLogger("apscheduler.executors.default").setLevel(logging.WARNING)
+
 app = FastAPI(title="BaseAlert")
 app.add_middleware(
     SessionMiddleware,
