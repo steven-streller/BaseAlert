@@ -5,7 +5,7 @@ from email.mime.text import MIMEText
 import requests
 from sqlmodel import Session
 
-from app.db import get_setting
+from app.db import get_user_setting
 
 logger = logging.getLogger("basealert.notifications")
 
@@ -189,21 +189,23 @@ for _channel in CHANNELS.values():
     _channel["keys"] = [field[0] for field in _channel["fields"]]
 
 
-def _channel_config(session: Session, channel: str) -> dict:
-    return {key: get_setting(session, key) for key in CHANNELS[channel]["keys"]}
+def _channel_config(session: Session, user_id: int, channel: str) -> dict:
+    return {key: get_user_setting(session, user_id, key) for key in CHANNELS[channel]["keys"]}
 
 
-def enabled_channels(session: Session) -> list[str]:
-    return [c for c in CHANNELS if get_setting(session, f"{c}_enabled") == "true"]
+def enabled_channels(session: Session, user_id: int) -> list[str]:
+    return [c for c in CHANNELS if get_user_setting(session, user_id, f"{c}_enabled") == "true"]
 
 
-def send_to_channel(session: Session, channel: str, title: str, message: str, url: str | None = None) -> bool:
-    cfg = _channel_config(session, channel)
+def send_to_channel(
+    session: Session, user_id: int, channel: str, title: str, message: str, url: str | None = None
+) -> bool:
+    cfg = _channel_config(session, user_id, channel)
     return CHANNELS[channel]["send"](cfg, title, message, url)
 
 
-def notify_all(session: Session, title: str, message: str, url: str | None = None) -> dict[str, bool]:
+def notify_all(session: Session, user_id: int, title: str, message: str, url: str | None = None) -> dict[str, bool]:
     results = {}
-    for channel in enabled_channels(session):
-        results[channel] = send_to_channel(session, channel, title, message, url)
+    for channel in enabled_channels(session, user_id):
+        results[channel] = send_to_channel(session, user_id, channel, title, message, url)
     return results

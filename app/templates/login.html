@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Anmelden - BaseAlert{% endblock %}
+{% block content %}
+<div class="auth-page">
+    <h1>Anmelden</h1>
+
+    {% if error %}<div class="error">E-Mail oder Passwort falsch.</div>{% endif %}
+
+    <form class="settings-form" method="post" action="/login">
+        <label>
+            E-Mail
+            <input type="email" name="email" required autofocus />
+        </label>
+        <label>
+            Passwort
+            <input type="password" name="password" required />
+        </label>
+        <button class="primary" type="submit">Anmelden</button>
+    </form>
+
+    <p class="hint">Noch keinen Account? <a href="/register">Registrieren</a></p>
+</div>
+{% endblock %}

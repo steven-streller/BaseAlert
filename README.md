@@ -6,7 +6,8 @@
 
 Überwacht die Sendepläne von TechnoBase.FM, HouseTime.FM, HardBase.FM und TranceBase.FM
 und schickt eine Benachrichtigung, wenn ein favorisierter DJ auflegt – egal auf welchem
-der vier Sender. DJs werden global verfolgt, nicht pro Sender.
+der vier Sender. DJs werden global verfolgt, nicht pro Sender. Mehrbenutzerfähig: jeder
+Account hat seine eigenen Favoriten und seine eigenen Benachrichtigungskanäle.
 
 ## Start (Docker Compose)
 
@@ -14,13 +15,14 @@ der vier Sender. DJs werden global verfolgt, nicht pro Sender.
 docker compose up -d --build
 ```
 
-Danach die GUI unter http://localhost:8000 öffnen:
+Danach unter http://localhost:8000 einen Account anlegen (`/register`) und einloggen.
+Registrierung ist offen – jeder mit Zugriff auf die URL kann sich einen Account anlegen.
 
 - **Dashboard** – "Jetzt auf Sendung" pro Sender, nächste Favoriten-Shows und eine
   nach Tag gruppierte Zeitleiste der kommenden 48 Stunden
 - **DJs** – alle bisher gescrapten DJs (global, sender-übergreifend) durchsuchen und favorisieren
-- **Einstellungen** – Scrape-Intervall, Vorlaufzeit der Benachrichtigung, sowie
-  beliebig viele gleichzeitig aktivierbare Benachrichtigungskanäle:
+- **Einstellungen** – Scrape-Intervall ist global (gemeinsame Sendeplan-Daten für alle),
+  Vorlaufzeit der Benachrichtigung sowie die Benachrichtigungskanäle sind pro Account:
   - **Pushover** (User Key + API Token von https://pushover.net)
   - **ntfy** (Server-URL + Topic, z.B. der öffentliche https://ntfy.sh oder eine eigene Instanz)
   - **Telegram** (Bot-Token + Chat-ID)
@@ -33,6 +35,31 @@ Danach die GUI unter http://localhost:8000 öffnen:
 
 Beim ersten Start wird sofort einmal gescraped; danach läuft es automatisch im
 eingestellten Intervall. Die SQLite-Datenbank liegt in `./data/basealert.db`.
+
+### Session-Secret
+
+Sessions werden über ein signiertes Cookie gehalten. Ohne `SESSION_SECRET_KEY` wird bei
+jedem Container-Start ein zufälliger Schlüssel generiert – dann sind nach jedem Neustart
+alle abgemeldet. Für einen stabilen Schlüssel `.env.example` nach `.env` kopieren und
+befüllen:
+
+```bash
+cp .env.example .env
+python3 -c "import secrets; print(secrets.token_hex(32))"  # in .env eintragen
+```
+
+### Upgrade von einer Version ohne Login
+
+Ältere Versionen kannten keine Accounts – ein globales Set an Favoriten und
+Benachrichtigungseinstellungen für alle. Damit diese Daten beim Upgrade nicht verloren
+gehen, beim ersten Start mit der neuen Version einmalig setzen:
+
+```bash
+BASEALERT_INITIAL_USER_EMAIL=du@example.com BASEALERT_INITIAL_USER_PASSWORD=... docker compose up -d
+```
+
+Die bestehenden Favoriten und Kanal-Einstellungen werden dann auf diesen neu
+angelegten Account migriert. Ohne diese Variablen werden sie beim Upgrade verworfen.
 
 ## Deployment in Kubernetes / k3s
 

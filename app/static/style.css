@@ -40,6 +40,55 @@ nav a {
 
 nav a.active, nav a:hover { color: var(--text); }
 
+nav .nav-user {
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    margin-left: 0.5rem;
+}
+
+nav .nav-logout { margin: 0; }
+
+.link-button {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 0.95rem;
+    padding: 0;
+    text-decoration: underline;
+}
+
+.link-button:hover { color: var(--text); }
+
+.auth-page {
+    max-width: 360px;
+    margin: 3rem auto 0;
+}
+
+.auth-page h1 {
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+.auth-page .error {
+    background: #3a2020;
+    border: 1px solid #6b3030;
+    color: #e6a3a3;
+    padding: 0.7rem 1rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+}
+
+.auth-page .hint {
+    text-align: center;
+    margin-top: 1rem;
+    font-size: 0.9rem;
+    color: var(--text-dim);
+}
+
+.auth-page .hint a { color: var(--accent); }
+
 main {
     max-width: 960px;
     margin: 0 auto;
@@ -223,6 +272,7 @@ form.settings-form label {
 }
 
 form.settings-form input[type=text],
+form.settings-form input[type=email],
 form.settings-form input[type=password],
 form.settings-form input[type=number] {
     background: var(--bg);
