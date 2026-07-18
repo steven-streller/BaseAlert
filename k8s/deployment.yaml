@@ -30,6 +30,16 @@ spec:
               value: Europe/Berlin
             - name: BASEALERT_DB_PATH
               value: /app/data/basealert.db
+            # Without this secret the app falls back to a random key generated
+            # at container start, which logs everyone out on every restart.
+            # kubectl create secret generic basealert-secrets -n basealert \
+            #   --from-literal=session-secret-key=$(python3 -c "import secrets; print(secrets.token_hex(32))")
+            - name: SESSION_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: basealert-secrets
+                  key: session-secret-key
+                  optional: true
           volumeMounts:
             - name: data
               mountPath: /app/data

@@ -1,21 +1,31 @@
 import logging
+import os
+import secrets
 from datetime import datetime, timedelta
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlmodel import Session, select
+from starlette.middleware.sessions import SessionMiddleware
 
-from app.db import engine, get_setting, init_db, set_setting
-from app.models import Dj, Favorite, Show, Station
+from app.auth import get_current_user, login_user, logout_user, require_user
+from app.db import engine, get_setting, get_user_setting, init_db, set_setting, set_user_setting
+from app.models import Dj, Favorite, Show, Station, User
 from app.notifications import CHANNELS, send_to_channel
 from app.scheduler import reschedule_scrape_job, start_scheduler
 from app.scraper import scrape_all
+from app.security import hash_password, verify_password
 
 logging.basicConfig(level=logging.INFO)
 
 app = FastAPI(title="BaseAlert")
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=os.environ.get("SESSION_SECRET_KEY") or secrets.token_hex(32),
+    same_site="lax",
+)
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
 
@@ -25,6 +35,73 @@ def on_startup() -> None:
     init_db()
     start_scheduler()
 
+
+# --- Auth -------------------------------------------------------------------
+
+
+@app.get("/register")
+def register_page(request: Request, error: str = ""):
+    if get_current_user(request):
+        return RedirectResponse(url="/", status_code=303)
+    return templates.TemplateResponse("register.html", {"request": request, "error": error})
+
+
+@app.post("/register")
+async def register(request: Request):
+    form = await request.form()
+    email = str(form.get("email", "")).strip().lower()
+    password = str(form.get("password", ""))
+    password_confirm = str(form.get("password_confirm", ""))
+
+    if not email or "@" not in email:
+        return RedirectResponse(url="/register?error=email", status_code=303)
+    if len(password) < 8:
+        return RedirectResponse(url="/register?error=password_length", status_code=303)
+    if password != password_confirm:
+        return RedirectResponse(url="/register?error=password_mismatch", status_code=303)
+
+    with Session(engine) as session:
+        if session.exec(select(User).where(User.email == email)).first():
+            return RedirectResponse(url="/register?error=taken", status_code=303)
+        user = User(email=email, password_hash=hash_password(password))
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+
+    login_user(request, user)
+    return RedirectResponse(url="/", status_code=303)
+
+
+@app.get("/login")
+def login_page(request: Request, error: str = ""):
+    if get_current_user(request):
+        return RedirectResponse(url="/", status_code=303)
+    return templates.TemplateResponse("login.html", {"request": request, "error": error})
+
+
+@app.post("/login")
+async def login(request: Request):
+    form = await request.form()
+    email = str(form.get("email", "")).strip().lower()
+    password = str(form.get("password", ""))
+
+    with Session(engine) as session:
+        user = session.exec(select(User).where(User.email == email)).first()
+
+    if not user or not verify_password(password, user.password_hash):
+        return RedirectResponse(url="/login?error=1", status_code=303)
+
+    login_user(request, user)
+    return RedirectResponse(url="/", status_code=303)
+
+
+@app.post("/logout")
+def logout(request: Request):
+    logout_user(request)
+    return RedirectResponse(url="/login", status_code=303)
+
+
+# --- Dashboard ----------------------------------------------------------------
 
 WEEKDAYS_DE = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
 
@@ -58,11 +135,13 @@ def _enrich(session: Session, shows: list[Show], favorite_dj_ids: set[int], toda
 
 
 @app.get("/")
-def dashboard(request: Request):
+def dashboard(request: Request, current_user: User = Depends(require_user)):
     with Session(engine) as session:
         now = datetime.now()
         today = now.date()
-        favorite_dj_ids = set(session.exec(select(Favorite.dj_id)).all())
+        favorite_dj_ids = set(
+            session.exec(select(Favorite.dj_id).where(Favorite.user_id == current_user.id)).all()
+        )
 
         favorite_rows = []
         if favorite_dj_ids:
@@ -107,6 +186,7 @@ def dashboard(request: Request):
         {
             "request": request,
             "active": "dashboard",
+            "current_user": current_user,
             "favorite_rows": favorite_rows,
             "now_playing": now_playing,
             "day_groups": day_groups,
@@ -128,13 +208,13 @@ def _dj_station_map(session: Session) -> dict[int, list[Station]]:
     return mapping
 
 
-def _dj_rows(session: Session, q: str) -> list[dict]:
+def _dj_rows(session: Session, user_id: int, q: str) -> list[dict]:
     query = select(Dj)
     if q:
         query = query.where(Dj.name.ilike(f"%{q}%"))
     djs = sorted(session.exec(query).all(), key=lambda d: d.name.lower())
     station_map = _dj_station_map(session)
-    favorite_ids = set(session.exec(select(Favorite.dj_id)).all())
+    favorite_ids = set(session.exec(select(Favorite.dj_id).where(Favorite.user_id == user_id)).all())
     return [
         {
             "dj": dj,
@@ -146,31 +226,33 @@ def _dj_rows(session: Session, q: str) -> list[dict]:
 
 
 @app.get("/djs")
-def djs_page(request: Request, q: str = ""):
+def djs_page(request: Request, q: str = "", current_user: User = Depends(require_user)):
     with Session(engine) as session:
-        rows = _dj_rows(session, q)
+        rows = _dj_rows(session, current_user.id, q)
     return templates.TemplateResponse(
-        "djs.html", {"request": request, "active": "djs", "rows": rows, "q": q}
+        "djs.html", {"request": request, "active": "djs", "current_user": current_user, "rows": rows, "q": q}
     )
 
 
 @app.get("/djs/list")
-def djs_list(request: Request, q: str = ""):
+def djs_list(request: Request, q: str = "", current_user: User = Depends(require_user)):
     with Session(engine) as session:
-        rows = _dj_rows(session, q)
+        rows = _dj_rows(session, current_user.id, q)
     return templates.TemplateResponse("_dj_list.html", {"request": request, "rows": rows})
 
 
 @app.post("/djs/{dj_id}/toggle")
-def toggle_favorite(request: Request, dj_id: int):
+def toggle_favorite(request: Request, dj_id: int, current_user: User = Depends(require_user)):
     with Session(engine) as session:
-        existing = session.exec(select(Favorite).where(Favorite.dj_id == dj_id)).first()
+        existing = session.exec(
+            select(Favorite).where(Favorite.user_id == current_user.id, Favorite.dj_id == dj_id)
+        ).first()
         if existing:
             session.delete(existing)
             session.commit()
             is_favorite = False
         else:
-            session.add(Favorite(dj_id=dj_id))
+            session.add(Favorite(user_id=current_user.id, dj_id=dj_id))
             session.commit()
             is_favorite = True
         dj = session.get(Dj, dj_id)
@@ -181,20 +263,28 @@ def toggle_favorite(request: Request, dj_id: int):
     )
 
 
+# --- Settings -----------------------------------------------------------------
+
 # checkbox settings keys that are absent from form data when unchecked
 CHANNEL_CHECKBOX_FIELDS = {
     field[0] for channel in CHANNELS.values() for field in channel["fields"] if field[2] == "checkbox"
 }
-CHECKBOX_KEYS = list(CHANNEL_CHECKBOX_FIELDS) + [f"{c}_enabled" for c in CHANNELS]
-GENERAL_KEYS = ["scrape_interval_minutes", "notify_lead_minutes"]
 CHANNEL_TEXT_KEYS = [key for channel in CHANNELS.values() for key in channel["keys"]]
 
 
 @app.get("/settings")
-def settings_page(request: Request, saved: str = "", tested: str = "", scraped: str = ""):
+def settings_page(
+    request: Request,
+    saved: str = "",
+    tested: str = "",
+    scraped: str = "",
+    current_user: User = Depends(require_user),
+):
     with Session(engine) as session:
-        keys = GENERAL_KEYS + CHECKBOX_KEYS + CHANNEL_TEXT_KEYS
-        settings = {key: get_setting(session, key) for key in keys}
+        settings = {"scrape_interval_minutes": get_setting(session, "scrape_interval_minutes")}
+        settings["notify_lead_minutes"] = get_user_setting(session, current_user.id, "notify_lead_minutes")
+        for key in list(CHANNEL_CHECKBOX_FIELDS) + [f"{c}_enabled" for c in CHANNELS] + CHANNEL_TEXT_KEYS:
+            settings[key] = get_user_setting(session, current_user.id, key)
 
     flash = None
     if saved:
@@ -212,6 +302,7 @@ def settings_page(request: Request, saved: str = "", tested: str = "", scraped: 
         {
             "request": request,
             "active": "settings",
+            "current_user": current_user,
             "settings": settings,
             "channels": CHANNELS,
             "flash": flash,
@@ -220,7 +311,7 @@ def settings_page(request: Request, saved: str = "", tested: str = "", scraped: 
 
 
 @app.post("/settings")
-async def save_settings(request: Request):
+async def save_settings(request: Request, current_user: User = Depends(require_user)):
     form = await request.form()
     section = form.get("_section", "general")
 
@@ -229,31 +320,33 @@ async def save_settings(request: Request):
             scrape_interval = max(5, int(form.get("scrape_interval_minutes") or 60))
             notify_lead = max(1, int(form.get("notify_lead_minutes") or 15))
             set_setting(session, "scrape_interval_minutes", str(scrape_interval))
-            set_setting(session, "notify_lead_minutes", str(notify_lead))
+            set_user_setting(session, current_user.id, "notify_lead_minutes", str(notify_lead))
             reschedule_scrape_job(scrape_interval)
         elif section in CHANNELS:
-            set_setting(session, f"{section}_enabled", "true" if form.get(f"{section}_enabled") else "false")
+            set_user_setting(
+                session, current_user.id, f"{section}_enabled", "true" if form.get(f"{section}_enabled") else "false"
+            )
             for key in CHANNELS[section]["keys"]:
                 if key in CHANNEL_CHECKBOX_FIELDS:
-                    set_setting(session, key, "true" if form.get(key) else "false")
+                    set_user_setting(session, current_user.id, key, "true" if form.get(key) else "false")
                 else:
-                    set_setting(session, key, str(form.get(key, "")).strip())
+                    set_user_setting(session, current_user.id, key, str(form.get(key, "")).strip())
 
     return RedirectResponse(url=f"/settings?saved={section}#{section}", status_code=303)
 
 
 @app.post("/settings/test/{channel}")
-def test_notification(channel: str):
+def test_notification(channel: str, current_user: User = Depends(require_user)):
     if channel not in CHANNELS:
         return RedirectResponse(url="/settings?tested=fail", status_code=303)
     with Session(engine) as session:
         ok = send_to_channel(
-            session, channel, "BaseAlert Test", "Testbenachrichtigung von BaseAlert 🎧"
+            session, current_user.id, channel, "BaseAlert Test", "Testbenachrichtigung von BaseAlert 🎧"
         )
     return RedirectResponse(url=f"/settings?tested={'ok' if ok else 'fail'}#{channel}", status_code=303)
 
 
 @app.post("/scrape-now")
-def scrape_now():
+def scrape_now(current_user: User = Depends(require_user)):
     scrape_all()
     return RedirectResponse(url="/settings?scraped=1", status_code=303)

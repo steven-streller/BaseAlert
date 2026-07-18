@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field, SQLModel, UniqueConstraint
 
 
 class Station(SQLModel, table=True):
@@ -32,17 +32,43 @@ class Show(SQLModel, table=True):
     image_url: Optional[str] = None
 
 
-class Favorite(SQLModel, table=True):
+class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    dj_id: int = Field(foreign_key="dj.id", unique=True, index=True)
+    email: str = Field(index=True, unique=True)
+    password_hash: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class Favorite(SQLModel, table=True):
+    __table_args__ = (UniqueConstraint("user_id", "dj_id"),)
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    dj_id: int = Field(foreign_key="dj.id", index=True)
 
 
 class NotificationLog(SQLModel, table=True):
+    __table_args__ = (UniqueConstraint("user_id", "show_id"),)
+
     id: Optional[int] = Field(default=None, primary_key=True)
-    show_id: int = Field(foreign_key="show.id", unique=True, index=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    show_id: int = Field(foreign_key="show.id", index=True)
     notified_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class Setting(SQLModel, table=True):
+    """Global settings shared by all users (currently just the scrape interval)."""
+
     key: str = Field(primary_key=True)
+    value: str
+
+
+class UserSetting(SQLModel, table=True):
+    """Per-user settings: notification channel config + notify lead time."""
+
+    __table_args__ = (UniqueConstraint("user_id", "key"),)
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    key: str = Field(index=True)
     value: str

@@ -5,8 +5,8 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from sqlmodel import Session, select
 
-from app.db import engine, get_setting
-from app.models import Dj, Favorite, NotificationLog, Show, Station
+from app.db import engine, get_setting, get_user_setting
+from app.models import Dj, Favorite, NotificationLog, Show, Station, User
 from app.notifications import enabled_channels, notify_all
 from app.scraper import scrape_all
 
@@ -21,47 +21,54 @@ def scrape_job() -> None:
     logger.info("Scrape results: %s", results)
 
 
-def notify_check_job() -> None:
-    with Session(engine) as session:
-        if not enabled_channels(session):
-            return
-        lead_minutes = int(get_setting(session, "notify_lead_minutes") or 15)
+def _notify_user(session: Session, user: User, now: datetime) -> None:
+    if not enabled_channels(session, user.id):
+        return
+    lead_minutes = int(get_user_setting(session, user.id, "notify_lead_minutes") or 15)
+    window_end = now + timedelta(minutes=lead_minutes)
 
-        now = datetime.now()
-        window_end = now + timedelta(minutes=lead_minutes)
+    favorite_dj_ids = set(session.exec(select(Favorite.dj_id).where(Favorite.user_id == user.id)).all())
+    if not favorite_dj_ids:
+        return
 
-        favorite_dj_ids = set(session.exec(select(Favorite.dj_id)).all())
-        if not favorite_dj_ids:
-            return
+    already_notified = set(
+        session.exec(select(NotificationLog.show_id).where(NotificationLog.user_id == user.id)).all()
+    )
 
-        already_notified = set(session.exec(select(NotificationLog.show_id)).all())
+    upcoming_shows = session.exec(
+        select(Show).where(Show.start_time >= now, Show.start_time <= window_end)
+    ).all()
 
-        upcoming_shows = session.exec(
-            select(Show).where(Show.start_time >= now, Show.start_time <= window_end)
-        ).all()
-
-        for show in upcoming_shows:
-            if show.id in already_notified or show.dj_id not in favorite_dj_ids:
-                continue
-            dj = session.get(Dj, show.dj_id)
-            station = session.get(Station, show.station_id)
-            title = f"{dj.name} legt gleich auf!"
-            message = (
-                f"{show.show_name or 'Show'} auf {station.name} "
-                f"um {show.start_time.strftime('%H:%M')} Uhr"
-                + (f" ({show.genre})" if show.genre else "")
+    for show in upcoming_shows:
+        if show.id in already_notified or show.dj_id not in favorite_dj_ids:
+            continue
+        dj = session.get(Dj, show.dj_id)
+        station = session.get(Station, show.station_id)
+        title = f"{dj.name} legt gleich auf!"
+        message = (
+            f"{show.show_name or 'Show'} auf {station.name} "
+            f"um {show.start_time.strftime('%H:%M')} Uhr"
+            + (f" ({show.genre})" if show.genre else "")
+        )
+        results = notify_all(session, user.id, title, message, url=station.base_url)
+        if any(results.values()):
+            session.add(NotificationLog(user_id=user.id, show_id=show.id))
+            session.commit()
+            logger.info(
+                "Notified %s for %s on %s at %s via %s",
+                user.email,
+                dj.name,
+                station.key,
+                show.start_time,
+                [c for c, ok in results.items() if ok],
             )
-            results = notify_all(session, title, message, url=station.base_url)
-            if any(results.values()):
-                session.add(NotificationLog(show_id=show.id))
-                session.commit()
-                logger.info(
-                    "Notified for %s on %s at %s via %s",
-                    dj.name,
-                    station.key,
-                    show.start_time,
-                    [c for c, ok in results.items() if ok],
-                )
+
+
+def notify_check_job() -> None:
+    now = datetime.now()
+    with Session(engine) as session:
+        for user in session.exec(select(User)).all():
+            _notify_user(session, user, now)
 
 
 def reschedule_scrape_job(minutes: int) -> None:
