@@ -18,8 +18,8 @@ docker compose up -d --build
 Danach unter http://localhost:8000 einen Account anlegen (`/register`) und einloggen.
 Registrierung ist standardmäßig offen – jeder mit Zugriff auf die URL kann sich einen
 Account anlegen. Sobald alle gewünschten Accounts existieren, `REGISTRATION_ENABLED=false`
-setzen (`.env` bei Compose, Env-Var in [k8s/deployment.yaml](k8s/deployment.yaml)), um
-weitere Registrierungen zu blockieren – bestehende Accounts können sich weiterhin einloggen.
+setzen, um weitere Registrierungen zu blockieren – bestehende Accounts können sich
+weiterhin einloggen.
 
 - **Dashboard** – "Jetzt auf Sendung" pro Sender, nächste Favoriten-Shows und eine
   nach Tag gruppierte Zeitleiste der kommenden 48 Stunden
@@ -57,35 +57,134 @@ python3 -c "import secrets; print(secrets.token_hex(32))"  # in .env eintragen
 
 ## Deployment in Kubernetes / k3s
 
-Fertige Manifeste liegen in [k8s/](k8s/). Sie erwarten das per CI gebaute Image
-`ghcr.io/steven-streller/basealert:latest`.
+Es liegen keine fertigen Manifeste im Repo – BaseAlert ist ein einzelner
+Pod mit einer kleinen PVC für die SQLite-Datenbank, das lässt sich leicht in
+euer eigenes Manifest-/GitOps-Setup einbauen. Beispiel zum Anpassen (Namespace,
+Storage-Class, Image-Tag, Hostname etc. auf eure Umgebung übertragen):
 
-```bash
-kubectl apply -k k8s/
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: basealert
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: basealert-data
+  namespace: basealert
+spec:
+  accessModes:
+    - ReadWriteOnce
+  # k3s ships "local-path" by default; swap for longhorn, nfs-subdir-*, etc.
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 256Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: basealert
+  namespace: basealert
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate # SQLite on a ReadWriteOnce volume can't be shared by two pods
+  selector:
+    matchLabels:
+      app: basealert
+  template:
+    metadata:
+      labels:
+        app: basealert
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        # Makes the PVC group-writable for GID 1000 - the image's own UID/GID
+        # 1000 user isn't guaranteed to own whatever the provisioner hands back.
+        fsGroup: 1000
+      # Only needed if the ghcr.io/<owner>/basealert package is private:
+      #   kubectl create secret docker-registry ghcr-creds -n basealert \
+      #     --docker-server=ghcr.io --docker-username=<gh-user> --docker-password=<gh-pat>
+      # imagePullSecrets:
+      #   - name: ghcr-creds
+      containers:
+        - name: basealert
+          image: ghcr.io/steven-streller/basealert:latest
+          ports:
+            - containerPort: 8000
+          env:
+            - name: TZ
+              value: Europe/Berlin
+            - name: BASEALERT_DB_PATH
+              value: /app/data/basealert.db
+            - name: REGISTRATION_ENABLED
+              value: "true"
+            # Without this secret the app falls back to a random key generated
+            # at container start, which logs everyone out on every restart.
+            # kubectl create secret generic basealert-secrets -n basealert \
+            #   --from-literal=session-secret-key=$(python3 -c "import secrets; print(secrets.token_hex(32))")
+            - name: SESSION_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: basealert-secrets
+                  key: session-secret-key
+                  optional: true
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+          resources:
+            requests:
+              cpu: 50m
+              memory: 96Mi
+            limits:
+              cpu: 300m
+              memory: 256Mi
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 30
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: basealert-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: basealert
+  namespace: basealert
+spec:
+  selector:
+    app: basealert
+  ports:
+    - port: 8000
+      targetPort: 8000
 ```
 
-Das legt Namespace `basealert`, eine `PersistentVolumeClaim` (Storage-Class
-`local-path`, wie sie k3s standardmäßig mitbringt), Deployment und Service an.
-Ressourcen-Bedarf ist minimal (siehe [k8s/deployment.yaml](k8s/deployment.yaml)):
-im Leerlauf ~70 MB RAM, kurze CPU-Spitzen nur während eines Scrape-Laufs.
+Ressourcen-Bedarf ist minimal: im Leerlauf ~70 MB RAM, kurze CPU-Spitzen nur
+während eines Scrape-Laufs.
 
-- **Privates GHCR-Image**: Falls das Package nicht öffentlich ist, vorher ein
-  Pull-Secret anlegen und in [k8s/deployment.yaml](k8s/deployment.yaml) das
-  auskommentierte `imagePullSecrets` aktivieren:
-  ```bash
-  kubectl create secret docker-registry ghcr-creds -n basealert \
-    --docker-server=ghcr.io --docker-username=<gh-user> --docker-password=<gh-pat>
-  ```
-- **Erreichbarkeit**: standardmäßig nur `ClusterIP`. Für Zugriff von außen entweder
-  `kubectl port-forward -n basealert svc/basealert 8000:8000` nutzen, oder
-  [k8s/ingress.yaml](k8s/ingress.yaml) mit echtem Hostnamen ausfüllen und separat
-  anwenden (`kubectl apply -f k8s/ingress.yaml`) – k3s bringt dafür Traefik mit.
-- **Non-root**: Das Image läuft als `appuser` (UID/GID 1000), passend zu
-  `securityContext.runAsUser: 1000` + `fsGroup: 1000` in
-  [k8s/deployment.yaml](k8s/deployment.yaml). Bei einem eigenen Deployment-Manifest
-  (nicht über `kubectl apply -k k8s/`) muss `fsGroup: 1000` dort ebenfalls gesetzt
-  sein, sonst ist die PVC nicht beschreibbar bzw. zeigt UID 1000 als
-  "I have no name!" ohne passenden `/etc/passwd`-Eintrag.
+- **Erreichbarkeit**: Der `Service` oben ist `ClusterIP`. Für Zugriff von außen
+  entweder `kubectl port-forward -n basealert svc/basealert 8000:8000` nutzen,
+  oder eine `Ingress`-Ressource mit echtem Hostnamen ergänzen (k3s bringt dafür
+  Traefik mit).
+- **Non-root**: Das Image läuft als `appuser` (UID/GID 1000). Der
+  `securityContext` oben (`runAsUser`/`runAsGroup`/`fsGroup: 1000`) ist nötig,
+  damit die PVC für diese UID beschreibbar gemountet wird – ohne passenden
+  `fsGroup` bzw. ohne einen zur UID passenden `/etc/passwd`-Eintrag im Image
+  zeigt sich das als "I have no name!" in einer interaktiven Shell.
 
 ## Entwicklung
 
