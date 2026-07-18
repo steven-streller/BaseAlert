@@ -21,57 +21,6 @@
     </form>
 </section>
 
-<section class="settings-section" id="windows">
-    <h2>Zeitfenster für Live-Benachrichtigungen</h2>
-    <p class="empty">
-        In diesen Zeitfenstern wirst du über jede laufende Show benachrichtigt –
-        unabhängig von deinen favorisierten DJs.
-    </p>
-
-    {% if listening_windows %}
-    <div class="window-list">
-        {% for w in listening_windows %}
-        <div class="window-row">
-            <span class="window-days">
-                {% for d in range(7) %}
-                    <span class="day-chip {{ 'active' if d in w.weekday_set() else '' }}">{{ weekday_labels[d] }}</span>
-                {% endfor %}
-            </span>
-            <span class="window-time">{{ w.start_time.strftime('%H:%M') }}–{{ w.end_time.strftime('%H:%M') }}</span>
-            {% if w.label %}<span class="window-label">{{ w.label }}</span>{% endif %}
-            <form method="post" action="/settings/windows/{{ w.id }}/delete">
-                <button class="link-button" type="submit">Löschen</button>
-            </form>
-        </div>
-        {% endfor %}
-    </div>
-    {% endif %}
-
-    <form class="settings-form" method="post" action="/settings/windows">
-        <label>
-            Bezeichnung (optional)
-            <input type="text" name="label" placeholder="Feierabend" />
-        </label>
-        <div class="weekday-picker">
-            {% for d in range(7) %}
-            <label class="weekday-checkbox">
-                <input type="checkbox" name="weekdays" value="{{ d }}" />
-                {{ weekday_labels[d] }}
-            </label>
-            {% endfor %}
-        </div>
-        <label>
-            Von
-            <input type="time" name="start_time" required />
-        </label>
-        <label>
-            Bis
-            <input type="time" name="end_time" required />
-        </label>
-        <button class="primary" type="submit">Zeitfenster hinzufügen</button>
-    </form>
-</section>
-
 <h2>Benachrichtigungskanäle</h2>
 {% for key, channel in channels.items() %}
     {% set is_enabled = settings[key + '_enabled'] == 'true' %}

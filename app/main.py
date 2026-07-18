@@ -295,9 +295,72 @@ def toggle_favorite(request: Request, dj_id: int, current_user: User = Depends(r
     )
 
 
-# --- Settings -----------------------------------------------------------------
+# --- Listening windows ---------------------------------------------------------
 
 WEEKDAY_SHORT_LABELS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
+
+
+@app.get("/windows")
+def windows_page(request: Request, saved: str = "", current_user: User = Depends(require_user)):
+    with Session(engine) as session:
+        listening_windows = session.exec(
+            select(ListeningWindow).where(ListeningWindow.user_id == current_user.id)
+        ).all()
+    return templates.TemplateResponse(
+        "windows.html",
+        {
+            "request": request,
+            "active": "windows",
+            "current_user": current_user,
+            "listening_windows": listening_windows,
+            "weekday_labels": WEEKDAY_SHORT_LABELS,
+            "flash": "Zeitfenster aktualisiert." if saved else None,
+        },
+    )
+
+
+@app.post("/windows")
+async def create_listening_window(request: Request, current_user: User = Depends(require_user)):
+    form = await request.form()
+    weekdays = form.getlist("weekdays")
+    start_raw = str(form.get("start_time", ""))
+    end_raw = str(form.get("end_time", ""))
+    label = str(form.get("label", "")).strip() or None
+
+    if not weekdays or not start_raw or not end_raw:
+        return RedirectResponse(url="/windows", status_code=303)
+
+    start_time = time.fromisoformat(start_raw)
+    end_time = time.fromisoformat(end_raw)
+    if start_time >= end_time:
+        return RedirectResponse(url="/windows", status_code=303)
+
+    with Session(engine) as session:
+        session.add(
+            ListeningWindow(
+                user_id=current_user.id,
+                label=label,
+                weekdays=",".join(sorted(weekdays)),
+                start_time=start_time,
+                end_time=end_time,
+            )
+        )
+        session.commit()
+
+    return RedirectResponse(url="/windows?saved=1", status_code=303)
+
+
+@app.post("/windows/{window_id}/delete")
+def delete_listening_window(window_id: int, current_user: User = Depends(require_user)):
+    with Session(engine) as session:
+        window = session.get(ListeningWindow, window_id)
+        if window and window.user_id == current_user.id:
+            session.delete(window)
+            session.commit()
+    return RedirectResponse(url="/windows?saved=1", status_code=303)
+
+
+# --- Settings -----------------------------------------------------------------
 
 # checkbox settings keys that are absent from form data when unchecked
 CHANNEL_CHECKBOX_FIELDS = {
@@ -319,14 +382,9 @@ def settings_page(
         settings["notify_lead_minutes"] = get_user_setting(session, current_user.id, "notify_lead_minutes")
         for key in list(CHANNEL_CHECKBOX_FIELDS) + [f"{c}_enabled" for c in CHANNELS] + CHANNEL_TEXT_KEYS:
             settings[key] = get_user_setting(session, current_user.id, key)
-        listening_windows = session.exec(
-            select(ListeningWindow).where(ListeningWindow.user_id == current_user.id)
-        ).all()
 
     flash = None
-    if saved == "windows":
-        flash = "Zeitfenster aktualisiert."
-    elif saved:
+    if saved:
         label = CHANNELS[saved]["label"] if saved in CHANNELS else "Allgemein"
         flash = f"„{label}“ gespeichert."
     elif tested == "ok":
@@ -344,8 +402,6 @@ def settings_page(
             "current_user": current_user,
             "settings": settings,
             "channels": CHANNELS,
-            "listening_windows": listening_windows,
-            "weekday_labels": WEEKDAY_SHORT_LABELS,
             "flash": flash,
         },
     )
@@ -374,47 +430,6 @@ async def save_settings(request: Request, current_user: User = Depends(require_u
                     set_user_setting(session, current_user.id, key, str(form.get(key, "")).strip())
 
     return RedirectResponse(url=f"/settings?saved={section}#{section}", status_code=303)
-
-
-@app.post("/settings/windows")
-async def create_listening_window(request: Request, current_user: User = Depends(require_user)):
-    form = await request.form()
-    weekdays = form.getlist("weekdays")
-    start_raw = str(form.get("start_time", ""))
-    end_raw = str(form.get("end_time", ""))
-    label = str(form.get("label", "")).strip() or None
-
-    if not weekdays or not start_raw or not end_raw:
-        return RedirectResponse(url="/settings?saved=windows#windows", status_code=303)
-
-    start_time = time.fromisoformat(start_raw)
-    end_time = time.fromisoformat(end_raw)
-    if start_time >= end_time:
-        return RedirectResponse(url="/settings?saved=windows#windows", status_code=303)
-
-    with Session(engine) as session:
-        session.add(
-            ListeningWindow(
-                user_id=current_user.id,
-                label=label,
-                weekdays=",".join(sorted(weekdays)),
-                start_time=start_time,
-                end_time=end_time,
-            )
-        )
-        session.commit()
-
-    return RedirectResponse(url="/settings?saved=windows#windows", status_code=303)
-
-
-@app.post("/settings/windows/{window_id}/delete")
-def delete_listening_window(window_id: int, current_user: User = Depends(require_user)):
-    with Session(engine) as session:
-        window = session.get(ListeningWindow, window_id)
-        if window and window.user_id == current_user.id:
-            session.delete(window)
-            session.commit()
-    return RedirectResponse(url="/settings?saved=windows#windows", status_code=303)
 
 
 @app.post("/settings/test/{channel}")

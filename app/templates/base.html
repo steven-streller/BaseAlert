@@ -14,6 +14,7 @@
         {% if current_user %}
         <a href="/" class="{{ 'active' if active == 'dashboard' else '' }}">Dashboard</a>
         <a href="/djs" class="{{ 'active' if active == 'djs' else '' }}">DJs</a>
+        <a href="/windows" class="{{ 'active' if active == 'windows' else '' }}">Zeitfenster</a>
         <a href="/settings" class="{{ 'active' if active == 'settings' else '' }}">Einstellungen</a>
         <span class="nav-user">{{ current_user.email }}</span>
         <form method="post" action="/logout" class="nav-logout">
