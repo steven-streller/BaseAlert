@@ -3,7 +3,7 @@ uvicorn[standard]==0.34.0
 sqlmodel>=0.0.24
 pydantic>=2.10
 beautifulsoup4==4.12.3
-requests==2.32.3
+requests==2.34.2
 apscheduler==3.10.4
 jinja2==3.1.5
 python-multipart==0.0.20
