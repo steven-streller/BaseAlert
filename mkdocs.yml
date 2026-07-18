@@ -1,0 +1,50 @@
+site_name: BaseAlert
+site_description: Sendeplan-Watcher für TechnoBase/HouseTime/HardBase/TranceBase.FM
+site_url: https://steven-streller.github.io/BaseAlert/
+repo_url: https://github.com/steven-streller/BaseAlert
+repo_name: steven-streller/BaseAlert
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: amber
+      toggle:
+        icon: material/brightness-4
+        name: Light Mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: amber
+      toggle:
+        icon: material/brightness-7
+        name: Dark Mode
+  icon:
+    repo: fontawesome/brands/github
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - content.action.edit
+    - search.suggest
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Start: index.md
+  - Setup:
+      - Entwicklung: setup/development.md
+      - Linux (systemd): setup/linux.md
+      - Docker: setup/docker.md
+      - Podman: setup/podman.md
+      - Kubernetes: setup/kubernetes.md
+  - Konfiguration: configuration.md
