@@ -48,3 +48,7 @@ nav:
       - Podman: setup/podman.md
       - Kubernetes: setup/kubernetes.md
   - Konfiguration: configuration.md
+  - Benachrichtigungskanäle: notifications.md
+  - FAQ: faq.md
+  - Architektur: architecture.md
+  - Mitwirken: contributing.md

@@ -39,7 +39,9 @@ Danach [Konfiguration](configuration.md) für die Referenz aller Umgebungsvariab
     - **E-Mail** (SMTP-Zugangsdaten)
 
   Jeder Kanal hat einen eigenen "Testen"-Button, der mit dem zuletzt
-  gespeicherten Stand dieses Kanals eine Testbenachrichtigung schickt.
+  gespeicherten Stand dieses Kanals eine Testbenachrichtigung schickt. Eine
+  Schritt-für-Schritt-Anleitung pro Kanal gibt's unter
+  [Benachrichtigungskanäle](notifications.md).
 
 Registrierung ist standardmäßig offen – jeder mit Zugriff auf die URL kann
 sich einen Account anlegen. Sobald alle gewünschten Accounts existieren,
@@ -49,3 +51,10 @@ einloggen.
 
 Beim ersten Start wird sofort einmal gescraped; danach läuft es automatisch im
 eingestellten Intervall.
+
+## Mehr
+
+- **[FAQ / Troubleshooting](faq.md)** – häufige Stolpersteine
+- **[Architektur](architecture.md)** – wie Scraping, Benachrichtigungen und
+  Multi-Tenancy zusammenspielen
+- **[Mitwirken](contributing.md)** – Branch/PR-Ablauf, Tests, Lint
