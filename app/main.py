@@ -20,6 +20,17 @@ from app.security import hash_password, verify_password
 
 logging.basicConfig(level=logging.INFO)
 
+
+class _HealthCheckLogFilter(logging.Filter):
+    """Keeps k8s readiness/liveness probe hits out of the access log - they'd
+    otherwise drown out everything else every few seconds."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return "/healthz" not in record.getMessage()
+
+
+logging.getLogger("uvicorn.access").addFilter(_HealthCheckLogFilter())
+
 app = FastAPI(title="BaseAlert")
 app.add_middleware(
     SessionMiddleware,
@@ -34,6 +45,11 @@ templates = Jinja2Templates(directory="app/templates")
 def on_startup() -> None:
     init_db()
     start_scheduler()
+
+
+@app.get("/healthz")
+def healthz():
+    return {"status": "ok"}
 
 
 # --- Auth -------------------------------------------------------------------
