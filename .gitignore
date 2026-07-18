@@ -8,3 +8,4 @@ data/*.db-journal
 .ruff_cache/
 .coverage
 *.egg-info/
+site/
