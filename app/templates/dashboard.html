@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - BaseAlert{% endblock %}
+{% block content %}
+<h1>Sendeplan-Übersicht</h1>
+
+{% if favorite_rows %}
+<h2>Nächste Favoriten</h2>
+<div class="favorite-strip">
+    {% for row in favorite_rows %}
+    <div class="favorite-chip" style="--dot-color: {{ row.station.color }}">
+        <span class="chip-time">{{ row.show.start_time.strftime('%a %H:%M') }}</span>
+        <span class="chip-dj">{{ row.dj.name if row.dj else 'Unbekannt' }}</span>
+        <span class="chip-station">{{ row.station.name }}</span>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<h2>Jetzt auf Sendung</h2>
+<div class="now-playing-grid">
+    {% for row in now_playing %}
+    <div class="now-card" style="--dot-color: {{ row.station.color }}">
+        <div class="now-station">{{ row.station.name }}</div>
+        {% if row.show %}
+        <div class="now-dj">{{ row.dj.name if row.dj else 'Unbekannt' }}{% if row.is_favorite %} ⭐{% endif %}</div>
+        {% if row.show.show_name %}<div class="now-show">{{ row.show.show_name }}</div>{% endif %}
+        <div class="now-time">
+            {{ row.show.start_time.strftime('%H:%M') }}{% if row.show.end_time %} – {{ row.show.end_time.strftime('%H:%M') }}{% endif %}
+        </div>
+        {% else %}
+        <div class="now-empty">Keine Daten</div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+
+<h2>Sendeplan der nächsten 48 Stunden</h2>
+{% if day_groups %}
+    {% for day_label, rows in day_groups %}
+    <h3 class="day-heading">{{ day_label }}</h3>
+    <div class="timeline">
+        {% for row in rows %}
+        <div class="timeline-row {{ 'favorite' if row.is_favorite else '' }}" style="--dot-color: {{ row.station.color }}">
+            <div class="timeline-time">{{ row.show.start_time.strftime('%H:%M') }}</div>
+            <div class="timeline-content">
+                <div class="timeline-head">
+                    <span class="station-tag" style="background: {{ row.station.color }}">{{ row.station.name }}</span>
+                    <span class="dj-name">{{ row.dj.name if row.dj else 'Unbekannt' }}</span>
+                    {% if row.is_favorite %}<span title="Favorit">⭐</span>{% endif %}
+                </div>
+                {% if row.show.show_name %}<div class="show-name">{{ row.show.show_name }}</div>{% endif %}
+                {% if row.show.genre %}<div class="genre">{{ row.show.genre }}</div>{% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endfor %}
+{% else %}
+    <p class="empty">Noch keine Daten. Warte auf den ersten Scrape-Lauf oder stoße ihn manuell in den <a href="/settings">Einstellungen</a> an.</p>
+{% endif %}
+{% endblock %}

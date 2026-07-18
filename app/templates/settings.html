@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Einstellungen - BaseAlert{% endblock %}
+{% block content %}
+<h1>Einstellungen</h1>
+
+{% if flash %}<div class="flash">{{ flash }}</div>{% endif %}
+
+<section class="settings-section" id="general">
+    <h2>Allgemein</h2>
+    <form class="settings-form" method="post" action="/settings">
+        <input type="hidden" name="_section" value="general" />
+        <label>
+            Scrape-Intervall (Minuten)
+            <input type="number" min="5" name="scrape_interval_minutes" value="{{ settings.scrape_interval_minutes }}" />
+        </label>
+        <label>
+            Vorlaufzeit für Benachrichtigung (Minuten vor Show-Start)
+            <input type="number" min="1" name="notify_lead_minutes" value="{{ settings.notify_lead_minutes }}" />
+        </label>
+        <button class="primary" type="submit">Speichern</button>
+    </form>
+</section>
+
+<h2>Benachrichtigungskanäle</h2>
+{% for key, channel in channels.items() %}
+    {% set is_enabled = settings[key + '_enabled'] == 'true' %}
+    <details class="channel" id="{{ key }}" {{ 'open' if is_enabled else '' }}>
+        <summary>
+            <span class="channel-name">{{ channel.label }}</span>
+            <span class="badge {{ 'on' if is_enabled else '' }}">{{ 'Aktiv' if is_enabled else 'Inaktiv' }}</span>
+        </summary>
+        <div class="channel-body">
+            <form class="settings-form" method="post" action="/settings">
+                <input type="hidden" name="_section" value="{{ key }}" />
+                <label class="checkbox-row">
+                    <input type="checkbox" name="{{ key }}_enabled" {{ 'checked' if is_enabled else '' }} />
+                    Aktiviert
+                </label>
+                {% for field_key, field_label, field_type, placeholder in channel.fields %}
+                    {% if field_type == "checkbox" %}
+                        <label class="checkbox-row">
+                            <input type="checkbox" name="{{ field_key }}" {{ 'checked' if settings[field_key] == 'true' else '' }} />
+                            {{ field_label }}
+                        </label>
+                    {% else %}
+                        <label>
+                            {{ field_label }}
+                            <input
+                                type="{{ field_type }}"
+                                name="{{ field_key }}"
+                                value="{{ settings[field_key] }}"
+                                {% if placeholder %}placeholder="{{ placeholder }}"{% endif %}
+                                autocomplete="off"
+                            />
+                        </label>
+                    {% endif %}
+                {% endfor %}
+                <button class="primary" type="submit">Speichern</button>
+            </form>
+            <form method="post" action="/settings/test/{{ key }}">
+                <button class="secondary" type="submit">Testen</button>
+            </form>
+        </div>
+    </details>
+{% endfor %}
+
+<section class="settings-section">
+    <h2>Sendepläne</h2>
+    <form method="post" action="/scrape-now">
+        <button class="secondary" type="submit">Jetzt scrapen</button>
+    </form>
+</section>
+{% endblock %}

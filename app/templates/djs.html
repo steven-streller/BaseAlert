@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}DJs - BaseAlert{% endblock %}
+{% block content %}
+<h1>DJs verwalten</h1>
+<input
+    class="search-box"
+    type="search"
+    name="q"
+    placeholder="DJ suchen..."
+    value="{{ q }}"
+    hx-get="/djs/list"
+    hx-trigger="keyup changed delay:300ms"
+    hx-target="#dj-list"
+    hx-swap="innerHTML"
+/>
+<div id="dj-list">
+    {% include "_dj_list.html" %}
+</div>
+{% endblock %}

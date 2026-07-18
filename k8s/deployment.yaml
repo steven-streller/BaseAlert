@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: basealert
+  namespace: basealert
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate # SQLite on a ReadWriteOnce volume can't be shared by two pods
+  selector:
+    matchLabels:
+      app: basealert
+  template:
+    metadata:
+      labels:
+        app: basealert
+    spec:
+      # Only needed if the ghcr.io/<owner>/basealert package is private:
+      #   kubectl create secret docker-registry ghcr-creds -n basealert \
+      #     --docker-server=ghcr.io --docker-username=<gh-user> --docker-password=<gh-pat>
+      # imagePullSecrets:
+      #   - name: ghcr-creds
+      containers:
+        - name: basealert
+          image: ghcr.io/steven-streller/basealert:latest
+          ports:
+            - containerPort: 8000
+          env:
+            - name: TZ
+              value: Europe/Berlin
+            - name: BASEALERT_DB_PATH
+              value: /app/data/basealert.db
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+          resources:
+            requests:
+              cpu: 50m
+              memory: 96Mi
+            limits:
+              cpu: 300m
+              memory: 256Mi
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 30
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: basealert-data

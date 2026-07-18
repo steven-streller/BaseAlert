@@ -1,0 +1,16 @@
+<div class="dj-row" id="dj-row-{{ dj.id }}">
+    <div class="dj-name">{{ dj.name }}</div>
+    <div class="dj-stations">
+        {% for station in stations %}
+            <span class="station-dot" style="background: {{ station.color }}" title="{{ station.name }}"></span>
+        {% endfor %}
+    </div>
+    <button
+        class="fav-btn {{ 'active' if is_favorite else '' }}"
+        hx-post="/djs/{{ dj.id }}/toggle"
+        hx-target="#dj-row-{{ dj.id }}"
+        hx-swap="outerHTML"
+    >
+        {{ '⭐ Favorit' if is_favorite else '☆ Favorisieren' }}
+    </button>
+</div>

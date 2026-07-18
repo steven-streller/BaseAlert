@@ -1,0 +1,9 @@
+{% if rows %}
+    {% for row in rows %}
+        {% with dj = row.dj, stations = row.stations, is_favorite = row.is_favorite %}
+            {% include "_dj_row.html" %}
+        {% endwith %}
+    {% endfor %}
+{% else %}
+    <p class="empty">Keine DJs gefunden.</p>
+{% endif %}

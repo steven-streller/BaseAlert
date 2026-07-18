@@ -1,0 +1,11 @@
+services:
+  basealert:
+    build: .
+    container_name: basealert
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - TZ=Europe/Berlin
