@@ -30,6 +30,10 @@ spec:
               value: Europe/Berlin
             - name: BASEALERT_DB_PATH
               value: /app/data/basealert.db
+            # Set to "false" once everyone who needs an account has one, to
+            # stop anyone else from signing up.
+            - name: REGISTRATION_ENABLED
+              value: "true"
             # Without this secret the app falls back to a random key generated
             # at container start, which logs everyone out on every restart.
             # kubectl create secret generic basealert-secrets -n basealert \

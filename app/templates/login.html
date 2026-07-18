@@ -18,6 +18,8 @@
         <button class="primary" type="submit">Anmelden</button>
     </form>
 
+    {% if registration_enabled %}
     <p class="hint">Noch keinen Account? <a href="/register">Registrieren</a></p>
+    {% endif %}
 </div>
 {% endblock %}
