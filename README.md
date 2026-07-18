@@ -16,7 +16,10 @@ docker compose up -d --build
 ```
 
 Danach unter http://localhost:8000 einen Account anlegen (`/register`) und einloggen.
-Registrierung ist offen – jeder mit Zugriff auf die URL kann sich einen Account anlegen.
+Registrierung ist standardmäßig offen – jeder mit Zugriff auf die URL kann sich einen
+Account anlegen. Sobald alle gewünschten Accounts existieren, `REGISTRATION_ENABLED=false`
+setzen (`.env` bei Compose, Env-Var in [k8s/deployment.yaml](k8s/deployment.yaml)), um
+weitere Registrierungen zu blockieren – bestehende Accounts können sich weiterhin einloggen.
 
 - **Dashboard** – "Jetzt auf Sendung" pro Sender, nächste Favoriten-Shows und eine
   nach Tag gruppierte Zeitleiste der kommenden 48 Stunden

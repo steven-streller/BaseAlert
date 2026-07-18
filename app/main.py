@@ -40,6 +40,8 @@ app.add_middleware(
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
 
+REGISTRATION_ENABLED = os.environ.get("REGISTRATION_ENABLED", "true").lower() != "false"
+
 
 @app.on_event("startup")
 def on_startup() -> None:
@@ -59,11 +61,17 @@ def healthz():
 def register_page(request: Request, error: str = ""):
     if get_current_user(request):
         return RedirectResponse(url="/", status_code=303)
-    return templates.TemplateResponse("register.html", {"request": request, "error": error})
+    return templates.TemplateResponse(
+        "register.html",
+        {"request": request, "error": error, "registration_enabled": REGISTRATION_ENABLED},
+    )
 
 
 @app.post("/register")
 async def register(request: Request):
+    if not REGISTRATION_ENABLED:
+        return RedirectResponse(url="/register", status_code=303)
+
     form = await request.form()
     email = str(form.get("email", "")).strip().lower()
     password = str(form.get("password", ""))
@@ -92,7 +100,10 @@ async def register(request: Request):
 def login_page(request: Request, error: str = ""):
     if get_current_user(request):
         return RedirectResponse(url="/", status_code=303)
-    return templates.TemplateResponse("login.html", {"request": request, "error": error})
+    return templates.TemplateResponse(
+        "login.html",
+        {"request": request, "error": error, "registration_enabled": REGISTRATION_ENABLED},
+    )
 
 
 @app.post("/login")
