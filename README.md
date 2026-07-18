@@ -48,19 +48,6 @@ cp .env.example .env
 python3 -c "import secrets; print(secrets.token_hex(32))"  # in .env eintragen
 ```
 
-### Upgrade von einer Version ohne Login
-
-Ältere Versionen kannten keine Accounts – ein globales Set an Favoriten und
-Benachrichtigungseinstellungen für alle. Damit diese Daten beim Upgrade nicht verloren
-gehen, beim ersten Start mit der neuen Version einmalig setzen:
-
-```bash
-BASEALERT_INITIAL_USER_EMAIL=du@example.com BASEALERT_INITIAL_USER_PASSWORD=... docker compose up -d
-```
-
-Die bestehenden Favoriten und Kanal-Einstellungen werden dann auf diesen neu
-angelegten Account migriert. Ohne diese Variablen werden sie beim Upgrade verworfen.
-
 ## Deployment in Kubernetes / k3s
 
 Fertige Manifeste liegen in [k8s/](k8s/). Sie erwarten das per CI gebaute Image
