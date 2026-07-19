@@ -40,3 +40,26 @@ def test_djs_search_filters_by_name(client, seed_dj):
 
     resp = client.get("/djs", params={"q": "no-such-dj"})
     assert seed_dj.name not in resp.text
+
+
+def test_djs_favorites_only_filter(client, seed_dj, test_engine):
+    from sqlmodel import Session
+
+    from app.models import Dj
+
+    with Session(test_engine) as session:
+        other_dj = Dj(name="DJ Other")
+        session.add(other_dj)
+        session.commit()
+        session.refresh(other_dj)
+
+    register(client, "alice@example.com")
+    client.post(f"/djs/{seed_dj.id}/toggle")
+
+    resp = client.get("/djs", params={"favorites_only": "true"})
+    assert seed_dj.name in resp.text
+    assert other_dj.name not in resp.text
+
+    resp = client.get("/djs")
+    assert seed_dj.name in resp.text
+    assert other_dj.name in resp.text
