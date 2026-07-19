@@ -242,13 +242,15 @@ def _dj_station_map(session: Session) -> dict[int, list[Station]]:
     return mapping
 
 
-def _dj_rows(session: Session, user_id: int, q: str) -> list[dict]:
+def _dj_rows(session: Session, user_id: int, q: str, favorites_only: bool = False) -> list[dict]:
     query = select(Dj)
     if q:
         query = query.where(Dj.name.ilike(f"%{q}%"))
     djs = sorted(session.exec(query).all(), key=lambda d: d.name.lower())
     station_map = _dj_station_map(session)
     favorite_ids = set(session.exec(select(Favorite.dj_id).where(Favorite.user_id == user_id)).all())
+    if favorites_only:
+        djs = [dj for dj in djs if dj.id in favorite_ids]
     return [
         {
             "dj": dj,
@@ -260,18 +262,30 @@ def _dj_rows(session: Session, user_id: int, q: str) -> list[dict]:
 
 
 @app.get("/djs")
-def djs_page(request: Request, q: str = "", current_user: User = Depends(require_user)):
+def djs_page(
+    request: Request, q: str = "", favorites_only: bool = False, current_user: User = Depends(require_user)
+):
     with Session(engine) as session:
-        rows = _dj_rows(session, current_user.id, q)
+        rows = _dj_rows(session, current_user.id, q, favorites_only)
     return templates.TemplateResponse(
-        "djs.html", {"request": request, "active": "djs", "current_user": current_user, "rows": rows, "q": q}
+        "djs.html",
+        {
+            "request": request,
+            "active": "djs",
+            "current_user": current_user,
+            "rows": rows,
+            "q": q,
+            "favorites_only": favorites_only,
+        },
     )
 
 
 @app.get("/djs/list")
-def djs_list(request: Request, q: str = "", current_user: User = Depends(require_user)):
+def djs_list(
+    request: Request, q: str = "", favorites_only: bool = False, current_user: User = Depends(require_user)
+):
     with Session(engine) as session:
-        rows = _dj_rows(session, current_user.id, q)
+        rows = _dj_rows(session, current_user.id, q, favorites_only)
     return templates.TemplateResponse("_dj_list.html", {"request": request, "rows": rows})
 
 
