@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.7](https://github.com/steven-streller/BaseAlert/compare/v0.1.6...v0.1.7) (2026-07-20)
+
+
+### Bug Fixes
+
+* pin apk package versions in Dockerfile ([#49](https://github.com/steven-streller/BaseAlert/issues/49)) ([3e2d995](https://github.com/steven-streller/BaseAlert/commit/3e2d995d8eaf1dfd8c1ad8726e8041d8edefa1c0))
+
 ## [0.1.6](https://github.com/steven-streller/BaseAlert/compare/v0.1.5...v0.1.6) (2026-07-20)
 
 
