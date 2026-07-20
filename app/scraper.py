@@ -76,10 +76,10 @@ def _parse_events(html: str):
         }
 
 
-def _get_or_create_dj(session: Session, event: dict) -> Dj:
+def _get_or_create_dj(session: Session, dj_cache: dict[str, Dj], event: dict) -> Dj:
     """DJs are tracked globally by name so the same person is recognized
     across all stations, not just the one they were first scraped from."""
-    dj = session.exec(select(Dj).where(Dj.name == event["dj_name"])).first()
+    dj = dj_cache.get(event["dj_name"])
     if dj:
         if event["external_id"] and not dj.external_id:
             dj.external_id = event["external_id"]
@@ -93,53 +93,77 @@ def _get_or_create_dj(session: Session, event: dict) -> Dj:
     )
     session.add(dj)
     session.flush()
+    dj_cache[dj.name] = dj
     return dj
 
 
-def scrape_station(session: Session, station: Station) -> int:
+def scrape_station(
+    session: Session,
+    station: Station,
+    http: requests.Session | None = None,
+    dj_cache: dict[str, Dj] | None = None,
+) -> int:
+    """Fetch and persist the schedule for a single station.
+
+    `http` and `dj_cache` can be shared across stations by the caller (see
+    `scrape_all`) to reuse HTTP connections and avoid a DJ lookup query per
+    event; if omitted, this creates and cleans up its own.
+    """
+    owns_http = http is None
+    if http is None:
+        http = requests.Session()
+    if dj_cache is None:
+        dj_cache = {dj.name: dj for dj in session.exec(select(Dj)).all()}
+
     count = 0
     today = datetime.now().date()
-    for offset in range(DAYS_AHEAD + 1):
-        day = today + timedelta(days=offset)
-        day_param = day.strftime("%Y-%m-%d 00:00:00")
-        try:
-            resp = requests.get(
-                f"{station.base_url}/sendeplan",
-                params={"station": station.key, "day": day_param},
-                headers=HEADERS,
-                timeout=15,
-            )
-            resp.raise_for_status()
-        except requests.RequestException as exc:
-            logger.warning("Failed to fetch %s day %s: %s", station.key, day_param, exc)
-            continue
+    existing_shows = {
+        show.start_time: show
+        for show in session.exec(select(Show).where(Show.station_id == station.id)).all()
+    }
 
-        for event in _parse_events(resp.text):
-            dj = _get_or_create_dj(session, event)
-            show = session.exec(
-                select(Show).where(
-                    Show.station_id == station.id, Show.start_time == event["start_time"]
+    try:
+        for offset in range(DAYS_AHEAD + 1):
+            day = today + timedelta(days=offset)
+            day_param = day.strftime("%Y-%m-%d 00:00:00")
+            try:
+                resp = http.get(
+                    f"{station.base_url}/sendeplan",
+                    params={"station": station.key, "day": day_param},
+                    headers=HEADERS,
+                    timeout=15,
                 )
-            ).first()
-            if show:
-                show.dj_id = dj.id
-                show.show_name = event["show_name"]
-                show.genre = event["genre"]
-                show.end_time = event["end_time"]
-                show.image_url = event["image_url"]
-            else:
-                show = Show(
-                    station_id=station.id,
-                    dj_id=dj.id,
-                    show_name=event["show_name"],
-                    genre=event["genre"],
-                    start_time=event["start_time"],
-                    end_time=event["end_time"],
-                    image_url=event["image_url"],
-                )
-            session.add(show)
-            count += 1
-    session.commit()
+                resp.raise_for_status()
+            except requests.RequestException as exc:
+                logger.warning("Failed to fetch %s day %s: %s", station.key, day_param, exc)
+                continue
+
+            for event in _parse_events(resp.text):
+                dj = _get_or_create_dj(session, dj_cache, event)
+                show = existing_shows.get(event["start_time"])
+                if show:
+                    show.dj_id = dj.id
+                    show.show_name = event["show_name"]
+                    show.genre = event["genre"]
+                    show.end_time = event["end_time"]
+                    show.image_url = event["image_url"]
+                else:
+                    show = Show(
+                        station_id=station.id,
+                        dj_id=dj.id,
+                        show_name=event["show_name"],
+                        genre=event["genre"],
+                        start_time=event["start_time"],
+                        end_time=event["end_time"],
+                        image_url=event["image_url"],
+                    )
+                    existing_shows[event["start_time"]] = show
+                session.add(show)
+                count += 1
+        session.commit()
+    finally:
+        if owns_http:
+            http.close()
     return count
 
 
@@ -147,10 +171,12 @@ def scrape_all() -> dict:
     results = {}
     with Session(engine) as session:
         stations = session.exec(select(Station)).all()
-        for station in stations:
-            try:
-                results[station.key] = scrape_station(session, station)
-            except Exception:
-                logger.exception("Error scraping %s", station.key)
-                results[station.key] = -1
+        dj_cache = {dj.name: dj for dj in session.exec(select(Dj)).all()}
+        with requests.Session() as http:
+            for station in stations:
+                try:
+                    results[station.key] = scrape_station(session, station, http=http, dj_cache=dj_cache)
+                except Exception:
+                    logger.exception("Error scraping %s", station.key)
+                    results[station.key] = -1
     return results
