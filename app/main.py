@@ -385,12 +385,19 @@ CHANNEL_CHECKBOX_FIELDS = {
 }
 CHANNEL_TEXT_KEYS = [key for channel in CHANNELS.values() for key in channel["keys"]]
 
-ALLOWED_SETTINGS_ANCHORS = {"general", *CHANNELS}
+ALLOWED_SETTINGS_ANCHORS = ("general", *CHANNELS)
 
 
 def _safe_settings_anchor(value: str) -> str:
-    """Only known channel keys or "general" may end up in a redirect URL/anchor."""
-    return value if value in ALLOWED_SETTINGS_ANCHORS else "general"
+    """Map arbitrary input onto a known-safe literal for use in a redirect URL/anchor.
+
+    Returns one of the ALLOWED_SETTINGS_ANCHORS literals, never the input itself,
+    so the redirect target can't carry attacker-controlled data (CWE-601).
+    """
+    for allowed in ALLOWED_SETTINGS_ANCHORS:
+        if allowed == value:
+            return allowed
+    return "general"
 
 
 @app.get("/settings")
