@@ -385,6 +385,13 @@ CHANNEL_CHECKBOX_FIELDS = {
 }
 CHANNEL_TEXT_KEYS = [key for channel in CHANNELS.values() for key in channel["keys"]]
 
+ALLOWED_SETTINGS_ANCHORS = {"general", *CHANNELS}
+
+
+def _safe_settings_anchor(value: str) -> str:
+    """Only known channel keys or "general" may end up in a redirect URL/anchor."""
+    return value if value in ALLOWED_SETTINGS_ANCHORS else "general"
+
 
 @app.get("/settings")
 def settings_page(
@@ -446,7 +453,8 @@ async def save_settings(request: Request, current_user: User = Depends(require_u
                 else:
                     set_user_setting(session, current_user.id, key, str(form.get(key, "")).strip())
 
-    return RedirectResponse(url=f"/settings?saved={section}#{section}", status_code=303)
+    anchor = _safe_settings_anchor(section)
+    return RedirectResponse(url=f"/settings?saved={anchor}#{anchor}", status_code=303)
 
 
 @app.post("/settings/test/{channel}")
@@ -457,7 +465,8 @@ def test_notification(channel: str, current_user: User = Depends(require_user)):
         ok = send_to_channel(
             session, current_user.id, channel, "BaseAlert Test", "Testbenachrichtigung von BaseAlert 🎧"
         )
-    return RedirectResponse(url=f"/settings?tested={'ok' if ok else 'fail'}#{channel}", status_code=303)
+    anchor = _safe_settings_anchor(channel)
+    return RedirectResponse(url=f"/settings?tested={'ok' if ok else 'fail'}#{anchor}", status_code=303)
 
 
 @app.post("/scrape-now")
