@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.6](https://github.com/steven-streller/BaseAlert/compare/v0.1.5...v0.1.6) (2026-07-20)
+
+
+### Performance
+
+* batch DJ/Show lookups and reuse HTTP session in scraper ([#46](https://github.com/steven-streller/BaseAlert/issues/46)) ([c193746](https://github.com/steven-streller/BaseAlert/commit/c1937463e6b77a90df2178b56c2738e2820a79c5))
+
 ## [0.1.5](https://github.com/steven-streller/BaseAlert/compare/v0.1.4...v0.1.5) (2026-07-20)
 
 
