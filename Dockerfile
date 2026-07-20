@@ -1,4 +1,16 @@
-FROM python:3.14-slim
+FROM python:3.14-alpine AS builder
+
+WORKDIR /app
+
+# bcrypt/uvloop/httptools ship musllinux wheels for most releases, but not
+# always for a brand-new CPython version — keep a build toolchain around
+# only in this stage so it never ends up in the final image.
+RUN apk add --no-cache --virtual .build-deps gcc musl-dev libffi-dev cargo
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+
+FROM python:3.14-alpine
 
 ENV TZ=Europe/Berlin \
     PYTHONUNBUFFERED=1 \
@@ -6,15 +18,14 @@ ENV TZ=Europe/Berlin \
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends tzdata && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache tzdata
 
 # Matches the UID/GID many clusters enforce for non-root pods (e.g. via
 # PodSecurityStandards or a runAsUser policy). Without a matching /etc/passwd
 # entry, that UID shows up as "I have no name!" in a shell.
-RUN groupadd --gid 1000 appuser && useradd --uid 1000 --gid appuser --create-home --shell /usr/sbin/nologin appuser
+RUN addgroup -g 1000 appuser && adduser -D -u 1000 -G appuser -s /sbin/nologin appuser
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY --from=builder /install /usr/local
 
 COPY app ./app
 
