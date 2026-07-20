@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.8](https://github.com/steven-streller/BaseAlert/compare/v0.1.7...v0.1.8) (2026-07-20)
+
+
+### Features
+
+* show app version in footer, bumped automatically by release-please ([#53](https://github.com/steven-streller/BaseAlert/issues/53)) ([cd40043](https://github.com/steven-streller/BaseAlert/commit/cd40043eb44f3299bc8fddc64ac22e647f32be75))
+
 ## [0.1.7](https://github.com/steven-streller/BaseAlert/compare/v0.1.6...v0.1.7) (2026-07-20)
 
 
