@@ -464,5 +464,25 @@ button.secondary {
     margin-bottom: 1rem;
 }
 
+#dj-filters {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+#dj-filters .search-box {
+    flex: 1;
+}
+
+.favorites-only-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-bottom: 1rem;
+    white-space: nowrap;
+    color: var(--text-dim);
+    cursor: pointer;
+}
+
 .empty { color: var(--text-dim); font-style: italic; padding: 1rem 0; }
 .flash { background: #24361f; border: 1px solid #3d5c33; color: #b7e0a0; padding: 0.7rem 1rem; border-radius: 8px; margin-bottom: 1rem; }
