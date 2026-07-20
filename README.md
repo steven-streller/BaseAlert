@@ -24,6 +24,11 @@ docker compose up -d --build
 
 Danach unter <http://localhost:8000> registrieren und loslegen.
 
+## Sicherheit
+
+Schwachstellen bitte nicht über öffentliche Issues melden, siehe
+[SECURITY.md](SECURITY.md).
+
 ## Lizenz
 
 MIT, siehe [LICENSE](LICENSE).

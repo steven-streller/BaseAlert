@@ -21,7 +21,8 @@ Danach [Konfiguration](configuration.md) für die Referenz aller Umgebungsvariab
 - **Dashboard** – "Jetzt auf Sendung" pro Sender, nächste Favoriten-Shows und
   eine nach Tag gruppierte Zeitleiste der kommenden 48 Stunden
 - **DJs** – alle bisher gescrapten DJs (global, sender-übergreifend)
-  durchsuchen und favorisieren
+  durchsuchen, favorisieren und per "Nur Favoriten"-Filter auf die eigene
+  Auswahl eingrenzen
 - **Zeitfenster** – Wochentage + Uhrzeit anlegen (z.B. "Mo-Fr 15:00-17:00").
   Startet in so einem Fenster irgendeine Show, wird benachrichtigt – egal ob
   der DJ favorisiert ist. Praktisch für Zeiten, in denen dir jeder Live-DJ
@@ -58,3 +59,5 @@ eingestellten Intervall.
 - **[Architektur](architecture.md)** – wie Scraping, Benachrichtigungen und
   Multi-Tenancy zusammenspielen
 - **[Mitwirken](contributing.md)** – Branch/PR-Ablauf, Tests, Lint
+- **[Sicherheitslücke melden](https://github.com/steven-streller/BaseAlert/security/policy)**
+  – Meldeweg für Schwachstellen (siehe `SECURITY.md` im Repo)

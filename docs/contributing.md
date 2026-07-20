@@ -12,6 +12,11 @@ zwei Status-Checks grün sein:
 Es ist kein Review-Approval erforderlich, damit auch Solo-Änderungen ohne
 zweite Person gemergt werden können – die CI-Checks sind das eigentliche Gate.
 
+Zusätzlich läuft bei jedem Push/PR ein Trivy-Scan des gebauten Images
+(innerhalb von `docker-build`) sowie CodeQL auf dem Python-Code (eigener
+`codeql`-Workflow, zusätzlich wöchentlich geplant) – beide sind nicht
+merge-blockierend, Funde landen im "Security"-Reiter des Repos.
+
 ```bash
 git checkout -b feature/mein-feature
 # Änderungen ...
