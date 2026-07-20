@@ -17,7 +17,7 @@ class _FakeResponse:
 
 
 def _stub_requests_get(monkeypatch, text: str = FIXTURE):
-    monkeypatch.setattr("app.scraper.requests.get", lambda *a, **k: _FakeResponse(text))
+    monkeypatch.setattr("app.scraper.requests.Session.get", lambda self, *a, **k: _FakeResponse(text))
 
 
 def test_scrape_station_creates_djs_and_shows(test_engine, monkeypatch):
