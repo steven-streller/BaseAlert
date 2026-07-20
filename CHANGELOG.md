@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/steven-streller/BaseAlert/compare/v0.1.2...v0.1.3) (2026-07-20)
+
+
+### Bug Fixes
+
+* lowercase the versioned image tag via metadata-action ([#37](https://github.com/steven-streller/BaseAlert/issues/37)) ([489cc9a](https://github.com/steven-streller/BaseAlert/commit/489cc9a4ce7b3e274365760acb54e1898123ec69))
+
 ## [0.1.2](https://github.com/steven-streller/BaseAlert/compare/v0.1.1...v0.1.2) (2026-07-20)
 
 
