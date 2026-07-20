@@ -67,8 +67,9 @@ def register_page(request: Request, error: str = ""):
     if get_current_user(request):
         return RedirectResponse(url="/", status_code=303)
     return templates.TemplateResponse(
+        request,
         "register.html",
-        {"request": request, "error": error, "registration_enabled": REGISTRATION_ENABLED},
+        {"error": error, "registration_enabled": REGISTRATION_ENABLED},
     )
 
 
@@ -106,8 +107,9 @@ def login_page(request: Request, error: str = ""):
     if get_current_user(request):
         return RedirectResponse(url="/", status_code=303)
     return templates.TemplateResponse(
+        request,
         "login.html",
-        {"request": request, "error": error, "registration_enabled": REGISTRATION_ENABLED},
+        {"error": error, "registration_enabled": REGISTRATION_ENABLED},
     )
 
 
@@ -216,9 +218,9 @@ def dashboard(request: Request, current_user: User = Depends(require_user)):
             day_groups[-1][1].append(row)
 
     return templates.TemplateResponse(
+        request,
         "dashboard.html",
         {
-            "request": request,
             "active": "dashboard",
             "current_user": current_user,
             "favorite_rows": favorite_rows,
@@ -264,7 +266,7 @@ def djs_page(request: Request, q: str = "", current_user: User = Depends(require
     with Session(engine) as session:
         rows = _dj_rows(session, current_user.id, q)
     return templates.TemplateResponse(
-        "djs.html", {"request": request, "active": "djs", "current_user": current_user, "rows": rows, "q": q}
+        request, "djs.html", {"active": "djs", "current_user": current_user, "rows": rows, "q": q}
     )
 
 
@@ -272,7 +274,7 @@ def djs_page(request: Request, q: str = "", current_user: User = Depends(require
 def djs_list(request: Request, q: str = "", current_user: User = Depends(require_user)):
     with Session(engine) as session:
         rows = _dj_rows(session, current_user.id, q)
-    return templates.TemplateResponse("_dj_list.html", {"request": request, "rows": rows})
+    return templates.TemplateResponse(request, "_dj_list.html", {"rows": rows})
 
 
 @app.post("/djs/{dj_id}/toggle")
@@ -292,8 +294,9 @@ def toggle_favorite(request: Request, dj_id: int, current_user: User = Depends(r
         dj = session.get(Dj, dj_id)
         stations = _dj_station_map(session).get(dj_id, [])
     return templates.TemplateResponse(
+        request,
         "_dj_row.html",
-        {"request": request, "dj": dj, "stations": stations, "is_favorite": is_favorite},
+        {"dj": dj, "stations": stations, "is_favorite": is_favorite},
     )
 
 
@@ -307,9 +310,9 @@ def windows_page(request: Request, saved: str = "", current_user: User = Depends
             select(ListeningWindow).where(ListeningWindow.user_id == current_user.id)
         ).all()
     return templates.TemplateResponse(
+        request,
         "windows.html",
         {
-            "request": request,
             "active": "windows",
             "current_user": current_user,
             "listening_windows": listening_windows,
@@ -395,9 +398,9 @@ def settings_page(
         flash = "Sendepläne wurden aktualisiert."
 
     return templates.TemplateResponse(
+        request,
         "settings.html",
         {
-            "request": request,
             "active": "settings",
             "current_user": current_user,
             "settings": settings,
