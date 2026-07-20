@@ -3,8 +3,12 @@ line-length = 110
 target-version = "py312"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B"]
+select = ["E", "F", "I", "UP", "B", "S"]
 ignore = ["E501", "UP007", "UP045", "B008"]
+
+[tool.ruff.lint.per-file-ignores]
+# assert + hardcoded test credentials are expected in tests, not a real risk
+"tests/**/*.py" = ["S101", "S105", "S106", "S107"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
