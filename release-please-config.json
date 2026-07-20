@@ -7,6 +7,7 @@
       "release-type": "simple",
       "package-name": "BaseAlert",
       "include-component-in-tag": false,
+      "extra-files": ["app/version.py"],
       "changelog-sections": [
         { "type": "feat", "section": "Features" },
         { "type": "fix", "section": "Bug Fixes" },
