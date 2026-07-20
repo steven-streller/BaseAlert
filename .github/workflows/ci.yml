@@ -12,6 +12,9 @@ permissions:
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - uses: actions/checkout@v7
 
@@ -27,6 +30,17 @@ jobs:
       - name: Ruff lint
         run: ruff check .
 
+      - name: Ruff SARIF report
+        if: always()
+        run: ruff check . --output-format=sarif > ruff-results.sarif
+
+      - name: Upload Ruff scan results
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: ruff-results.sarif
+          category: ruff
+
       - name: Pytest
         run: pytest -v
 
@@ -37,6 +51,36 @@ jobs:
       security-events: write
     steps:
       - uses: actions/checkout@v7
+
+      - name: Lint Dockerfile with Hadolint
+        uses: hadolint/hadolint-action@v3.3.0
+        with:
+          dockerfile: Dockerfile
+          format: sarif
+          output-file: hadolint-results.sarif
+          no-fail: true
+
+      - name: Upload Hadolint scan results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: hadolint-results.sarif
+          category: hadolint
+
+      - name: Scan dependencies with Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: sarif
+          output: trivy-fs-results.sarif
+          severity: CRITICAL,HIGH
+          exit-code: "0"
+
+      - name: Upload Trivy dependency scan results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-fs-results.sarif
+          category: trivy-fs
 
       - uses: docker/setup-buildx-action@v4
 
@@ -59,10 +103,11 @@ jobs:
           severity: CRITICAL,HIGH
           exit-code: "0"
 
-      - name: Upload Trivy scan results
+      - name: Upload Trivy image scan results
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: trivy-results.sarif
+          category: trivy-image
 
       - name: Fail on critical vulnerabilities with a fix available
         uses: aquasecurity/trivy-action@v0.36.0
