@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.5](https://github.com/steven-streller/BaseAlert/compare/v0.1.4...v0.1.5) (2026-07-20)
+
+
+### Bug Fixes
+
+* return literal anchors instead of tainted input in settings redirect ([#41](https://github.com/steven-streller/BaseAlert/issues/41)) ([6461ff4](https://github.com/steven-streller/BaseAlert/commit/6461ff4a80bbe14b17008f169b5f5a9e1d2214fd))
+
 ## [0.1.4](https://github.com/steven-streller/BaseAlert/compare/v0.1.3...v0.1.4) (2026-07-20)
 
 
