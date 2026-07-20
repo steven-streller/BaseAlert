@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/steven-streller/BaseAlert/compare/v0.1.1...v0.1.2) (2026-07-20)
+
+
+### Bug Fixes
+
+* trigger a release to verify versioned image tag publishing ([#35](https://github.com/steven-streller/BaseAlert/issues/35)) ([95b11d9](https://github.com/steven-streller/BaseAlert/commit/95b11d9ed2a8d5e392c4ff96d2c50d5b3fce71cb))
+
 ## [0.1.1](https://github.com/steven-streller/BaseAlert/compare/v0.1.0...v0.1.1) (2026-07-19)
 
 
