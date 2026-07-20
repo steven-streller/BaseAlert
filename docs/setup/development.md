@@ -10,7 +10,7 @@ pip install -r requirements-dev.txt
 ## Tests & Lint
 
 ```bash
-pytest              # 48 Tests, ~76% Coverage
+pytest              # 49 Tests, ~76% Coverage
 ruff check .         # Lint
 ```
 
