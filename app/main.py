@@ -17,6 +17,7 @@ from app.notifications import CHANNELS, send_to_channel
 from app.scheduler import reschedule_scrape_job, start_scheduler
 from app.scraper import scrape_all
 from app.security import hash_password, verify_password
+from app.version import __version__
 
 logging.basicConfig(level=logging.INFO)
 
@@ -44,6 +45,7 @@ app.add_middleware(
 )
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
+templates.env.globals["app_version"] = __version__
 
 REGISTRATION_ENABLED = os.environ.get("REGISTRATION_ENABLED", "true").lower() != "false"
 
