@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.4](https://github.com/steven-streller/BaseAlert/compare/v0.1.3...v0.1.4) (2026-07-20)
+
+
+### Bug Fixes
+
+* switch base image to Alpine and close open-redirect CodeQL findings ([#39](https://github.com/steven-streller/BaseAlert/issues/39)) ([2178732](https://github.com/steven-streller/BaseAlert/commit/21787324d98e3641d40e4308bc395f0ce072f4b2))
+
 ## [0.1.3](https://github.com/steven-streller/BaseAlert/compare/v0.1.2...v0.1.3) (2026-07-20)
 
 
