@@ -1,0 +1,43 @@
+name: Release-please auto-merge
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  automerge:
+    runs-on: ubuntu-latest
+    if: >
+      github.actor == 'github-actions[bot]' &&
+      contains(github.event.pull_request.labels.*.name, 'autorelease: pending')
+    steps:
+      # Major bumps get flagged for a manual look (e.g. the eventual 1.0.0
+      # cut) instead of merging unattended; minor/patch releases auto-merge
+      # once required status checks are green.
+      - name: Compare manifest versions
+        id: bump
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          old_version=$(gh api "repos/$REPO/contents/.release-please-manifest.json?ref=$BASE_SHA" --jq '.content' | base64 -d | jq -r '.["."]')
+          new_version=$(gh api "repos/$REPO/contents/.release-please-manifest.json?ref=$HEAD_SHA" --jq '.content' | base64 -d | jq -r '.["."]')
+          echo "old version: $old_version, new version: $new_version"
+          if [ "${old_version%%.*}" != "${new_version%%.*}" ]; then
+            echo "major=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "major=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Enable auto-merge for minor/patch releases
+        if: steps.bump.outputs.major == 'false'
+        run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
