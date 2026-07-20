@@ -32,6 +32,9 @@ jobs:
 
   docker-build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - uses: actions/checkout@v7
 
@@ -42,5 +45,21 @@ jobs:
         with:
           context: .
           push: false
+          load: true
+          tags: basealert:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Scan image with Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: basealert:ci
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
+          exit-code: "0"
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
