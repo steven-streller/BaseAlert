@@ -45,9 +45,6 @@ jobs:
           category: ruff
 
       - name: Mypy type check
-        # Informational for now - the codebase isn't fully typed-clean yet.
-        # Flip this off once the existing findings are worked down.
-        continue-on-error: true
         run: mypy app
 
       - name: Pytest
