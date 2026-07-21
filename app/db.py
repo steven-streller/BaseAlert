@@ -117,6 +117,17 @@ def get_user_setting(session: Session, user_id: int, key: str) -> str:
     return setting.value if setting else USER_DEFAULT_SETTINGS.get(key, "")
 
 
+def get_user_settings(session: Session, user_id: int) -> dict[str, str]:
+    """Loads all of a user's settings in a single query, merged over the defaults.
+
+    Use this instead of calling `get_user_setting` per key when several keys
+    are needed at once (e.g. checking all notification channels) - avoids one
+    query per key.
+    """
+    rows = session.exec(select(UserSetting).where(UserSetting.user_id == user_id)).all()
+    return {**USER_DEFAULT_SETTINGS, **{row.key: row.value for row in rows}}
+
+
 def set_user_setting(session: Session, user_id: int, key: str, value: str) -> None:
     setting = session.exec(
         select(UserSetting).where(UserSetting.user_id == user_id, UserSetting.key == key)

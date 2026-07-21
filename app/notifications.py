@@ -5,7 +5,7 @@ from email.mime.text import MIMEText
 import requests
 from sqlmodel import Session
 
-from app.db import get_user_setting
+from app.db import get_user_settings
 
 logger = logging.getLogger("basealert.notifications")
 
@@ -187,12 +187,17 @@ for _channel in CHANNELS.values():
     _channel["keys"] = [field[0] for field in _channel["fields"]]
 
 
+def _channel_config_from_settings(settings: dict[str, str], channel: str) -> dict:
+    return {key: settings.get(key, "") for key in CHANNELS[channel]["keys"]}
+
+
 def _channel_config(session: Session, user_id: int, channel: str) -> dict:
-    return {key: get_user_setting(session, user_id, key) for key in CHANNELS[channel]["keys"]}
+    return _channel_config_from_settings(get_user_settings(session, user_id), channel)
 
 
 def enabled_channels(session: Session, user_id: int) -> list[str]:
-    return [c for c in CHANNELS if get_user_setting(session, user_id, f"{c}_enabled") == "true"]
+    settings = get_user_settings(session, user_id)
+    return [c for c in CHANNELS if settings.get(f"{c}_enabled") == "true"]
 
 
 def send_to_channel(
@@ -205,7 +210,17 @@ def send_to_channel(
 def notify_all(
     session: Session, user_id: int, title: str, message: str, url: str | None = None
 ) -> dict[str, bool]:
+    """Sends to every channel the user has enabled.
+
+    Loads all of the user's settings in one query up front (instead of via
+    `enabled_channels`/`send_to_channel`, which would each re-query) since a
+    user may have several channels enabled at once.
+    """
+    settings = get_user_settings(session, user_id)
     results = {}
-    for channel in enabled_channels(session, user_id):
-        results[channel] = send_to_channel(session, user_id, channel, title, message, url)
+    for channel in CHANNELS:
+        if settings.get(f"{channel}_enabled") != "true":
+            continue
+        cfg = _channel_config_from_settings(settings, channel)
+        results[channel] = CHANNELS[channel]["send"](cfg, title, message, url)
     return results

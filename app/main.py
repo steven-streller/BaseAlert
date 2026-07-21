@@ -11,7 +11,7 @@ from sqlmodel import Session, func, select
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.auth import get_current_user, login_user, logout_user, require_admin, require_user
-from app.db import engine, get_setting, get_user_setting, init_db, set_setting, set_user_setting
+from app.db import engine, get_setting, get_user_settings, init_db, set_setting, set_user_setting
 from app.models import (
     Dj,
     Favorite,
@@ -423,9 +423,7 @@ def settings_page(
 ):
     with Session(engine) as session:
         settings = {"scrape_interval_minutes": get_setting(session, "scrape_interval_minutes")}
-        settings["notify_lead_minutes"] = get_user_setting(session, current_user.id, "notify_lead_minutes")
-        for key in list(CHANNEL_CHECKBOX_FIELDS) + [f"{c}_enabled" for c in CHANNELS] + CHANNEL_TEXT_KEYS:
-            settings[key] = get_user_setting(session, current_user.id, key)
+        settings.update(get_user_settings(session, current_user.id))
 
     flash = None
     if saved:
