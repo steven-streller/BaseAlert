@@ -8,10 +8,19 @@
     <a href="/admin/settings" class="{{ 'active' if admin_active == 'settings' else '' }}">Einstellungen</a>
 </div>
 
-<p class="empty">
-    Scrape-Intervall: alle {{ scrape_interval }} Minuten ·
-    {% if next_run %}nächster Lauf um {{ next_run.strftime('%d.%m. %H:%M') }} Uhr{% else %}kein Lauf geplant{% endif %}
-</p>
+<section class="settings-section">
+    <h2>Scrape-Intervall</h2>
+    <form class="settings-form" method="post" action="/admin/health/scrape-interval">
+        <label>
+            Minuten zwischen automatischen Scrape-Läufen
+            <input type="number" min="5" name="scrape_interval_minutes" value="{{ scrape_interval }}" />
+        </label>
+        <button class="primary" type="submit">Speichern</button>
+    </form>
+    <p class="empty">
+        {% if next_run %}Nächster Lauf um {{ next_run.strftime('%d.%m. %H:%M') }} Uhr{% else %}Kein Lauf geplant{% endif %}
+    </p>
+</section>
 
 <form method="post" action="/scrape-now">
     <button class="secondary" type="submit">Jetzt scrapen</button>

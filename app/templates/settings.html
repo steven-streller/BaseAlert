@@ -10,10 +10,6 @@
     <form class="settings-form" method="post" action="/settings">
         <input type="hidden" name="_section" value="general" />
         <label>
-            Scrape-Intervall (Minuten)
-            <input type="number" min="5" name="scrape_interval_minutes" value="{{ settings.scrape_interval_minutes }}" />
-        </label>
-        <label>
             Vorlaufzeit für Benachrichtigung (Minuten vor Show-Start)
             <input type="number" min="1" name="notify_lead_minutes" value="{{ settings.notify_lead_minutes }}" />
         </label>

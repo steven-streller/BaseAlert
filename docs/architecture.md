@@ -21,7 +21,7 @@ einziger Container, kein separater Worker/Broker.
 | `User` | pro Account | E-Mail, bcrypt-Passworthash, `is_admin`-Flag |
 | `Favorite` | pro Nutzer | Verknüpfung User↔Dj |
 | `ListeningWindow` | pro Nutzer | Wochentage + Zeitfenster für "jede Show benachrichtigen" |
-| `Setting` | global | Aktuell nur `scrape_interval_minutes` |
+| `Setting` | global | `scrape_interval_minutes`, `registration_enabled`, `session_secret_key` |
 | `UserSetting` | pro Nutzer | Benachrichtigungskanäle + Vorlaufzeit |
 | `NotificationLog` | pro Nutzer | Verhindert doppelte Benachrichtigungen für dieselbe Show |
 | `ScrapeStatus` | global, pro Sender | Letzter Scrape-Versuch/-Erfolg, letzter Fehler, Fehler-Streak – Grundlage der Admin-Statusseite |

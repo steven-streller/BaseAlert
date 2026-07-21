@@ -443,8 +443,7 @@ def settings_page(
     current_user: User = Depends(require_user),
 ):
     with Session(engine) as session:
-        settings = {"scrape_interval_minutes": get_setting(session, "scrape_interval_minutes")}
-        settings.update(get_user_settings(session, current_user.id))
+        settings = get_user_settings(session, current_user.id)
 
     flash = None
     if saved:
@@ -477,11 +476,8 @@ async def save_settings(request: Request, current_user: User = Depends(require_u
 
     with Session(engine) as session:
         if section == "general":
-            scrape_interval = max(5, int(form.get("scrape_interval_minutes") or 60))
             notify_lead = max(1, int(form.get("notify_lead_minutes") or 15))
-            set_setting(session, "scrape_interval_minutes", str(scrape_interval))
             set_user_setting(session, current_user.id, "notify_lead_minutes", str(notify_lead))
-            reschedule_scrape_job(scrape_interval)
         elif section in CHANNELS:
             set_user_setting(
                 session,
@@ -608,6 +604,16 @@ def admin_health_page(request: Request, current_user: User = Depends(require_adm
             "next_run": next_scrape_run(),
         },
     )
+
+
+@app.post("/admin/health/scrape-interval")
+async def admin_set_scrape_interval(request: Request, current_user: User = Depends(require_admin)):
+    form = await request.form()
+    scrape_interval = max(5, int(form.get("scrape_interval_minutes") or 60))
+    with Session(engine) as session:
+        set_setting(session, "scrape_interval_minutes", str(scrape_interval))
+    reschedule_scrape_job(scrape_interval)
+    return RedirectResponse(url="/admin/health", status_code=303)
 
 
 @app.get("/admin/settings")

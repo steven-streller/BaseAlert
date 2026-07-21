@@ -141,3 +141,27 @@ def test_admin_health_page_shows_error_status(client, test_engine):
     page = client.get("/admin/health")
     assert "Connection timed out" in page.text
     assert "3x in Folge" in page.text
+
+
+def test_admin_can_set_scrape_interval(client):
+    register(client, "alice@example.com")
+    resp = client.post(
+        "/admin/health/scrape-interval", data={"scrape_interval_minutes": "42"}, follow_redirects=False
+    )
+    assert resp.status_code == 303
+    assert resp.headers["location"] == "/admin/health"
+
+    page = client.get("/admin/health")
+    assert 'value="42"' in page.text
+
+
+def test_non_admin_cannot_set_scrape_interval(client):
+    from app.main import app
+
+    register(client, "alice@example.com")  # becomes admin
+    bob = TestClient(app)
+    register(bob, "bob@example.com")
+
+    assert (
+        bob.post("/admin/health/scrape-interval", data={"scrape_interval_minutes": "42"}).status_code == 404
+    )

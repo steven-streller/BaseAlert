@@ -16,8 +16,8 @@ Weboberfläche selbst (Einstellungen-Seite).
 
 `Scrape-Intervall` (wie oft die vier Sender neu abgefragt werden) ist global
 für alle Accounts gemeinsam, da die Sendeplan-Daten selbst geteilt sind – nicht
-über eine Umgebungsvariable, sondern über die Einstellungen-Seite (Standard: 60
-Minuten).
+über eine Umgebungsvariable, sondern nur von einem Admin über
+`/admin/health` einstellbar (Standard: 60 Minuten).
 
 `Vorlaufzeit der Benachrichtigung` (wie viele Minuten vor Show-Start
 benachrichtigt wird) ist dagegen pro Account einstellbar, ebenfalls über die

@@ -3,21 +3,18 @@ from fastapi.testclient import TestClient
 from tests.conftest import register
 
 
-def test_general_section_scrape_interval_is_global(client):
-    from app.main import app
+def test_scrape_interval_not_settable_via_user_settings_page(client):
+    register(client, "alice@example.com")
 
-    alice = client
-    register(alice, "alice@example.com")
-    bob = TestClient(app)
-    register(bob, "bob@example.com")
+    page = client.get("/settings")
+    assert "scrape_interval_minutes" not in page.text
 
-    alice.post(
+    client.post(
         "/settings",
         data={"_section": "general", "scrape_interval_minutes": "42", "notify_lead_minutes": "7"},
     )
-
-    bob_settings = bob.get("/settings")
-    assert 'value="42"' in bob_settings.text  # scrape_interval_minutes: shared
+    admin_page = client.get("/admin/health")
+    assert 'value="42"' not in admin_page.text  # posting it via /settings has no effect
 
 
 def test_general_section_notify_lead_is_per_user(client):
