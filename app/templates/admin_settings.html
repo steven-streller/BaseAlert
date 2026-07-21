@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Instanz-Einstellungen - BaseAlert{% endblock %}
+{% block content %}
+<h1>Administration</h1>
+<div class="admin-subnav">
+    <a href="/admin/users" class="{{ 'active' if admin_active == 'users' else '' }}">Nutzer</a>
+    <a href="/admin/health" class="{{ 'active' if admin_active == 'health' else '' }}">Sender-Status</a>
+    <a href="/admin/settings" class="{{ 'active' if admin_active == 'settings' else '' }}">Einstellungen</a>
+</div>
+
+{% if flash %}<div class="flash">{{ flash }}</div>{% endif %}
+
+<div class="settings-section">
+    <h2>Registrierung</h2>
+    <form class="settings-form" method="post" action="/admin/settings">
+        <label class="checkbox-row">
+            <input type="checkbox" name="registration_enabled" {{ 'checked' if registration_enabled else '' }} />
+            Registrierung neuer Accounts erlauben
+        </label>
+        <button class="primary" type="submit">Speichern</button>
+    </form>
+</div>
+
+<div class="settings-section">
+    <h2>Session-Secret</h2>
+    {% if env_secret_set %}
+    <p class="empty">
+        Wird über die Umgebungsvariable <code>SESSION_SECRET_KEY</code> verwaltet - hier nicht änderbar.
+    </p>
+    {% else %}
+    <p class="empty">
+        Wird automatisch erzeugt und in der Datenbank gespeichert, damit Sessions auch ohne gesetzte
+        Umgebungsvariable Neustarts überleben. Ein Neu-Erzeugen meldet alle Nutzer ab und wird erst
+        nach einem Neustart der App aktiv.
+    </p>
+    <form
+        method="post"
+        action="/admin/settings/regenerate-secret"
+        onsubmit="return confirm('Session-Secret wirklich neu erzeugen? Alle Nutzer werden dadurch abgemeldet, der Effekt tritt erst nach einem Neustart der App ein.');"
+    >
+        <button class="secondary" type="submit">Neu erzeugen</button>
+    </form>
+    {% endif %}
+</div>
+{% endblock %}

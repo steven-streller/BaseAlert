@@ -29,9 +29,13 @@ bleibt).
 
 ## Nach jedem Neustart bin ich abgemeldet
 
-`SESSION_SECRET_KEY` ist nicht gesetzt – ohne festen Wert generiert BaseAlert
-bei jedem Start einen neuen zufälligen Schlüssel, wodurch alle bestehenden
-Sessions ungültig werden. Siehe [Konfiguration](configuration.md).
+Ohne gesetzte `SESSION_SECRET_KEY` erzeugt BaseAlert beim allerersten Start
+einen zufälligen Schlüssel und speichert ihn seitdem in der Datenbank, statt
+ihn bei jedem Neustart neu zu würfeln – Sessions überleben also normalerweise
+einen Neustart. Passiert es trotzdem bei jedem Neustart, läuft
+`BASEALERT_DB_PATH` vermutlich auf einem nicht-persistenten Pfad (z.B. kein
+gemountetes Volume), sodass auch der gespeicherte Schlüssel jedes Mal
+verloren geht. Siehe [Konfiguration](configuration.md).
 
 ## Ein Sender liefert im Log eine DNS-/Verbindungsfehlermeldung
 
@@ -55,9 +59,12 @@ auch der Abgleich "startet die Show gleich" entsprechend.
 
 ## Registrierung geht nicht mehr
 
-`REGISTRATION_ENABLED=false` gesetzt (absichtlich, siehe
-[Konfiguration](configuration.md)) – bestehende Accounts können sich
-weiterhin einloggen, es kann sich nur niemand Neues mehr registrieren.
+Registrierung wurde deaktiviert – entweder absichtlich im Admin-Panel unter
+`/admin/settings` umgeschaltet, oder (nur beim allerersten Start) über
+`REGISTRATION_ENABLED=false`, siehe [Konfiguration](configuration.md).
+Bestehende Accounts können sich weiterhin einloggen, es kann sich nur
+niemand Neues mehr registrieren. Ein Admin kann es jederzeit im Admin-Panel
+wieder aktivieren, ohne die App neu zu starten.
 
 ## Backup
 

@@ -5,6 +5,7 @@
 <div class="admin-subnav">
     <a href="/admin/users" class="{{ 'active' if admin_active == 'users' else '' }}">Nutzer</a>
     <a href="/admin/health" class="{{ 'active' if admin_active == 'health' else '' }}">Sender-Status</a>
+    <a href="/admin/settings" class="{{ 'active' if admin_active == 'settings' else '' }}">Einstellungen</a>
 </div>
 
 {% if rows %}
@@ -34,7 +35,7 @@
                 action="/admin/users/{{ row.user.id }}/delete"
                 onsubmit="return confirm('Account {{ row.user.email }} wirklich löschen? Favoriten, Zeitfenster und Einstellungen gehen dabei verloren.');"
             >
-                <button class="link-button" type="submit">Löschen</button>
+                <button class="link-button danger" type="submit">Löschen</button>
             </form>
         </div>
         {% endif %}

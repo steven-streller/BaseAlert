@@ -1,4 +1,5 @@
 import os
+import secrets
 
 from sqlmodel import Session, SQLModel, create_engine, select
 
@@ -32,6 +33,13 @@ STATIONS = [
 # Shared across every user - scraping the schedules isn't a per-user concern.
 GLOBAL_DEFAULT_SETTINGS = {
     "scrape_interval_minutes": "60",
+    # Read once as the initial value on first startup (same idea as
+    # BASEALERT_DB_PATH above) - after that first seed this Setting row is
+    # the source of truth and is toggled live from the admin settings page,
+    # so the env var is no longer consulted.
+    "registration_enabled": "true"
+    if os.environ.get("REGISTRATION_ENABLED", "true").lower() != "false"
+    else "false",
 }
 
 # Each user gets their own copy of these: notification channels + lead time.
@@ -110,11 +118,46 @@ def set_setting(session: Session, key: str, value: str) -> None:
     session.commit()
 
 
+def get_or_create_session_secret(session: Session) -> str:
+    """Persists a random session-signing secret in Settings on first run, so
+    session cookies survive restarts even without SESSION_SECRET_KEY set.
+    An explicit SESSION_SECRET_KEY env var still takes precedence - callers
+    check that first and only fall back to this (e.g. so several Kubernetes
+    replicas can share one signing key via a shared env var).
+    """
+    existing = get_setting(session, "session_secret_key")
+    if existing:
+        return existing
+    value = secrets.token_hex(32)
+    set_setting(session, "session_secret_key", value)
+    return value
+
+
+def regenerate_session_secret(session: Session) -> str:
+    """Rotates the DB-stored session secret, invalidating every existing
+    session cookie. Only takes effect after the app restarts - the signing
+    key used by the running process is fixed at startup."""
+    value = secrets.token_hex(32)
+    set_setting(session, "session_secret_key", value)
+    return value
+
+
 def get_user_setting(session: Session, user_id: int, key: str) -> str:
     setting = session.exec(
         select(UserSetting).where(UserSetting.user_id == user_id, UserSetting.key == key)
     ).first()
     return setting.value if setting else USER_DEFAULT_SETTINGS.get(key, "")
+
+
+def get_user_settings(session: Session, user_id: int) -> dict[str, str]:
+    """Loads all of a user's settings in a single query, merged over the defaults.
+
+    Use this instead of calling `get_user_setting` per key when several keys
+    are needed at once (e.g. checking all notification channels) - avoids one
+    query per key.
+    """
+    rows = session.exec(select(UserSetting).where(UserSetting.user_id == user_id)).all()
+    return {**USER_DEFAULT_SETTINGS, **{row.key: row.value for row in rows}}
 
 
 def set_user_setting(session: Session, user_id: int, key: str, value: str) -> None:

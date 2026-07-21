@@ -38,13 +38,23 @@ def _notify_user(session: Session, user: User, now: datetime) -> None:
     if not favorite_dj_ids and not listening_windows:
         return
 
-    already_notified = set(
-        session.exec(select(NotificationLog.show_id).where(NotificationLog.user_id == user.id)).all()
-    )
-
     upcoming_shows = session.exec(
         select(Show).where(Show.start_time >= now, Show.start_time <= window_end)
     ).all()
+    if not upcoming_shows:
+        return
+
+    # Scoped to just the upcoming shows - the user's full notification history
+    # only ever grows and is irrelevant here, a show that already happened can
+    # never be "upcoming" again.
+    already_notified = set(
+        session.exec(
+            select(NotificationLog.show_id).where(
+                NotificationLog.user_id == user.id,
+                NotificationLog.show_id.in_([show.id for show in upcoming_shows]),
+            )
+        ).all()
+    )
 
     for show in upcoming_shows:
         if show.id in already_notified:
