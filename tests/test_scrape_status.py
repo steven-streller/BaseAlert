@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from sqlmodel import Session, select
@@ -14,6 +15,12 @@ class _FakeResponse:
 
     def raise_for_status(self) -> None:
         pass
+
+    def json(self):
+        # all seeded stations have an api_id, so the API is tried first; this
+        # HTML fixture isn't valid JSON, which makes scrape_station fall back
+        # to HTML scraping - same as the tb-group API being unreachable.
+        return json.loads(self.text)
 
 
 def test_scrape_all_records_success_status(test_engine, monkeypatch):
