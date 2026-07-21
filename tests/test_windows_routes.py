@@ -7,7 +7,12 @@ def test_create_and_list_window(client):
     register(client, "alice@example.com")
     resp = client.post(
         "/windows",
-        data={"label": "Feierabend", "weekdays": ["0", "1", "2", "3", "4"], "start_time": "15:00", "end_time": "17:00"},
+        data={
+            "label": "Feierabend",
+            "weekdays": ["0", "1", "2", "3", "4"],
+            "start_time": "15:00",
+            "end_time": "17:00",
+        },
         follow_redirects=False,
     )
     assert resp.headers["location"] == "/windows?saved=1"

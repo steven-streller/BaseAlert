@@ -34,7 +34,7 @@ def test_notify_user_sends_for_favorite_and_dedups(test_engine, monkeypatch):
     calls = []
     monkeypatch.setattr(
         "app.scheduler.notify_all",
-        lambda session, user_id, title, message, url=None: (calls.append(title) or {"fake": True}),
+        lambda session, user_id, title, message, url=None: calls.append(title) or {"fake": True},
     )
 
     with Session(test_engine) as session:
@@ -62,7 +62,7 @@ def test_notify_user_sends_for_listening_window_when_not_favorite(test_engine, m
     calls = []
     monkeypatch.setattr(
         "app.scheduler.notify_all",
-        lambda session, user_id, title, message, url=None: (calls.append(title) or {"fake": True}),
+        lambda session, user_id, title, message, url=None: calls.append(title) or {"fake": True},
     )
 
     with Session(test_engine) as session:

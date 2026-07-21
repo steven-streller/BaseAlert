@@ -92,9 +92,7 @@ def send_webhook(cfg: dict, title: str, message: str, url: str | None = None) ->
         logger.warning("Webhook not configured, skipping")
         return False
     try:
-        resp = requests.post(
-            webhook_url, json={"title": title, "message": message, "url": url}, timeout=10
-        )
+        resp = requests.post(webhook_url, json={"title": title, "message": message, "url": url}, timeout=10)
         resp.raise_for_status()
         return True
     except requests.RequestException as exc:
@@ -204,7 +202,9 @@ def send_to_channel(
     return CHANNELS[channel]["send"](cfg, title, message, url)
 
 
-def notify_all(session: Session, user_id: int, title: str, message: str, url: str | None = None) -> dict[str, bool]:
+def notify_all(
+    session: Session, user_id: int, title: str, message: str, url: str | None = None
+) -> dict[str, bool]:
     results = {}
     for channel in enabled_channels(session, user_id):
         results[channel] = send_to_channel(session, user_id, channel, title, message, url)

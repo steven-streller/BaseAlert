@@ -34,9 +34,7 @@ def _notify_user(session: Session, user: User, now: datetime) -> None:
     window_end = now + timedelta(minutes=lead_minutes)
 
     favorite_dj_ids = set(session.exec(select(Favorite.dj_id).where(Favorite.user_id == user.id)).all())
-    listening_windows = session.exec(
-        select(ListeningWindow).where(ListeningWindow.user_id == user.id)
-    ).all()
+    listening_windows = session.exec(select(ListeningWindow).where(ListeningWindow.user_id == user.id)).all()
     if not favorite_dj_ids and not listening_windows:
         return
 
@@ -62,8 +60,7 @@ def _notify_user(session: Session, user: User, now: datetime) -> None:
         title = f"{dj_name} legt gleich auf!" if is_favorite else f"Live gleich: {dj_name}"
         message = (
             f"{show.show_name or 'Show'} auf {station.name} "
-            f"um {show.start_time.strftime('%H:%M')} Uhr"
-            + (f" ({show.genre})" if show.genre else "")
+            f"um {show.start_time.strftime('%H:%M')} Uhr" + (f" ({show.genre})" if show.genre else "")
         )
         results = notify_all(session, user.id, title, message, url=station.base_url)
         if any(results.values()):
