@@ -16,6 +16,9 @@
         <a href="/djs" class="{{ 'active' if active == 'djs' else '' }}">DJs</a>
         <a href="/windows" class="{{ 'active' if active == 'windows' else '' }}">Zeitfenster</a>
         <a href="/settings" class="{{ 'active' if active == 'settings' else '' }}">Einstellungen</a>
+        {% if current_user.is_admin %}
+        <a href="/admin/users" class="{{ 'active' if active == 'admin' else '' }}">Admin</a>
+        {% endif %}
         <span class="nav-user">{{ current_user.email }}</span>
         <form method="post" action="/logout" class="nav-logout">
             <button type="submit" class="link-button">Abmelden</button>

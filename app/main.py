@@ -7,14 +7,24 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from sqlmodel import Session, select
+from sqlmodel import Session, func, select
 from starlette.middleware.sessions import SessionMiddleware
 
-from app.auth import get_current_user, login_user, logout_user, require_user
+from app.auth import get_current_user, login_user, logout_user, require_admin, require_user
 from app.db import engine, get_setting, get_user_setting, init_db, set_setting, set_user_setting
-from app.models import Dj, Favorite, ListeningWindow, Show, Station, User
-from app.notifications import CHANNELS, send_to_channel
-from app.scheduler import reschedule_scrape_job, start_scheduler
+from app.models import (
+    Dj,
+    Favorite,
+    ListeningWindow,
+    NotificationLog,
+    ScrapeStatus,
+    Show,
+    Station,
+    User,
+    UserSetting,
+)
+from app.notifications import CHANNELS, enabled_channels, send_to_channel
+from app.scheduler import next_scrape_run, reschedule_scrape_job, start_scheduler
 from app.scraper import scrape_all
 from app.security import hash_password, verify_password
 from app.version import __version__
@@ -95,7 +105,8 @@ async def register(request: Request):
     with Session(engine) as session:
         if session.exec(select(User).where(User.email == email)).first():
             return RedirectResponse(url="/register?error=taken", status_code=303)
-        user = User(email=email, password_hash=hash_password(password))
+        is_first_user = session.exec(select(User.id).limit(1)).first() is None
+        user = User(email=email, password_hash=hash_password(password), is_admin=is_first_user)
         session.add(user)
         session.commit()
         session.refresh(user)
@@ -485,3 +496,96 @@ def test_notification(channel: str, current_user: User = Depends(require_user)):
 def scrape_now(current_user: User = Depends(require_user)):
     scrape_all()
     return RedirectResponse(url="/settings?scraped=1", status_code=303)
+
+
+# --- Admin ----------------------------------------------------------------
+
+
+def _admin_user_rows(session: Session) -> list[dict]:
+    users = session.exec(select(User).order_by(User.created_at)).all()
+    favorite_counts: dict[int, int] = {}
+    for user_id, count in session.exec(
+        select(Favorite.user_id, func.count()).group_by(Favorite.user_id)
+    ).all():
+        favorite_counts[user_id] = count
+    window_counts: dict[int, int] = {}
+    for user_id, count in session.exec(
+        select(ListeningWindow.user_id, func.count()).group_by(ListeningWindow.user_id)
+    ).all():
+        window_counts[user_id] = count
+    return [
+        {
+            "user": user,
+            "favorite_count": favorite_counts.get(user.id, 0),
+            "window_count": window_counts.get(user.id, 0),
+            "channel_count": len(enabled_channels(session, user.id)),
+        }
+        for user in users
+    ]
+
+
+@app.get("/admin/users")
+def admin_users_page(request: Request, current_user: User = Depends(require_admin)):
+    with Session(engine) as session:
+        rows = _admin_user_rows(session)
+    return templates.TemplateResponse(
+        request,
+        "admin_users.html",
+        {"active": "admin", "admin_active": "users", "current_user": current_user, "rows": rows},
+    )
+
+
+@app.post("/admin/users/{user_id}/toggle-admin")
+def admin_toggle_admin(user_id: int, current_user: User = Depends(require_admin)):
+    if user_id != current_user.id:
+        with Session(engine) as session:
+            user = session.get(User, user_id)
+            if user:
+                user.is_admin = not user.is_admin
+                session.add(user)
+                session.commit()
+    return RedirectResponse(url="/admin/users", status_code=303)
+
+
+@app.post("/admin/users/{user_id}/delete")
+def admin_delete_user(user_id: int, current_user: User = Depends(require_admin)):
+    if user_id != current_user.id:
+        with Session(engine) as session:
+            user = session.get(User, user_id)
+            if user:
+                for model in (Favorite, ListeningWindow, UserSetting, NotificationLog):
+                    for row in session.exec(select(model).where(model.user_id == user_id)).all():
+                        session.delete(row)
+                session.delete(user)
+                session.commit()
+    return RedirectResponse(url="/admin/users", status_code=303)
+
+
+@app.get("/admin/health")
+def admin_health_page(request: Request, current_user: User = Depends(require_admin)):
+    now = datetime.now()
+    with Session(engine) as session:
+        stations = session.exec(select(Station)).all()
+        statuses = {s.station_id: s for s in session.exec(select(ScrapeStatus)).all()}
+        rows = []
+        for station in stations:
+            status = statuses.get(station.id)
+            upcoming_count = session.exec(
+                select(func.count())
+                .select_from(Show)
+                .where(Show.station_id == station.id, Show.start_time >= now)
+            ).one()
+            rows.append({"station": station, "status": status, "upcoming_count": upcoming_count})
+        scrape_interval = get_setting(session, "scrape_interval_minutes")
+    return templates.TemplateResponse(
+        request,
+        "admin_health.html",
+        {
+            "active": "admin",
+            "admin_active": "health",
+            "current_user": current_user,
+            "rows": rows,
+            "scrape_interval": scrape_interval,
+            "next_run": next_scrape_run(),
+        },
+    )
