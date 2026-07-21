@@ -1,6 +1,5 @@
 import logging
 import os
-import secrets
 from datetime import datetime, time, timedelta
 
 from fastapi import Depends, FastAPI, Request
@@ -11,7 +10,16 @@ from sqlmodel import Session, func, select
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.auth import get_current_user, login_user, logout_user, require_admin, require_user
-from app.db import engine, get_setting, get_user_settings, init_db, set_setting, set_user_setting
+from app.db import (
+    engine,
+    get_or_create_session_secret,
+    get_setting,
+    get_user_settings,
+    init_db,
+    regenerate_session_secret,
+    set_setting,
+    set_user_setting,
+)
 from app.models import (
     Dj,
     Favorite,
@@ -47,22 +55,31 @@ logging.getLogger("uvicorn.access").addFilter(_HealthCheckLogFilter())
 # two log lines a minute forever. Failures still come through at ERROR.
 logging.getLogger("apscheduler.executors.default").setLevel(logging.WARNING)
 
+# SessionMiddleware's secret_key has to be fixed before the app is first
+# invoked as an ASGI callable - Starlette builds the middleware stack on
+# that first call (which includes the lifespan "startup" event), and
+# add_middleware() raises once that's built. So the DB has to be ready and
+# the secret resolved here at import time, ahead of the rest of init_db()'s
+# callers, which can wait for the startup event as usual.
+init_db()
+with Session(engine) as _startup_session:
+    _session_secret_key = os.environ.get("SESSION_SECRET_KEY") or get_or_create_session_secret(
+        _startup_session
+    )
+
 app = FastAPI(title="BaseAlert")
 app.add_middleware(
     SessionMiddleware,
-    secret_key=os.environ.get("SESSION_SECRET_KEY") or secrets.token_hex(32),
+    secret_key=_session_secret_key,
     same_site="lax",
 )
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
 templates.env.globals["app_version"] = __version__
 
-REGISTRATION_ENABLED = os.environ.get("REGISTRATION_ENABLED", "true").lower() != "false"
-
 
 @app.on_event("startup")
 def on_startup() -> None:
-    init_db()
     start_scheduler()
 
 
@@ -78,31 +95,33 @@ def healthz():
 def register_page(request: Request, error: str = ""):
     if get_current_user(request):
         return RedirectResponse(url="/", status_code=303)
+    with Session(engine) as session:
+        registration_enabled = get_setting(session, "registration_enabled") == "true"
     return templates.TemplateResponse(
         request,
         "register.html",
-        {"error": error, "registration_enabled": REGISTRATION_ENABLED},
+        {"error": error, "registration_enabled": registration_enabled},
     )
 
 
 @app.post("/register")
 async def register(request: Request):
-    if not REGISTRATION_ENABLED:
-        return RedirectResponse(url="/register", status_code=303)
-
-    form = await request.form()
-    email = str(form.get("email", "")).strip().lower()
-    password = str(form.get("password", ""))
-    password_confirm = str(form.get("password_confirm", ""))
-
-    if not email or "@" not in email:
-        return RedirectResponse(url="/register?error=email", status_code=303)
-    if len(password) < 8:
-        return RedirectResponse(url="/register?error=password_length", status_code=303)
-    if password != password_confirm:
-        return RedirectResponse(url="/register?error=password_mismatch", status_code=303)
-
     with Session(engine) as session:
+        if get_setting(session, "registration_enabled") != "true":
+            return RedirectResponse(url="/register", status_code=303)
+
+        form = await request.form()
+        email = str(form.get("email", "")).strip().lower()
+        password = str(form.get("password", ""))
+        password_confirm = str(form.get("password_confirm", ""))
+
+        if not email or "@" not in email:
+            return RedirectResponse(url="/register?error=email", status_code=303)
+        if len(password) < 8:
+            return RedirectResponse(url="/register?error=password_length", status_code=303)
+        if password != password_confirm:
+            return RedirectResponse(url="/register?error=password_mismatch", status_code=303)
+
         if session.exec(select(User).where(User.email == email)).first():
             return RedirectResponse(url="/register?error=taken", status_code=303)
         is_first_user = session.exec(select(User.id).limit(1)).first() is None
@@ -119,10 +138,12 @@ async def register(request: Request):
 def login_page(request: Request, error: str = ""):
     if get_current_user(request):
         return RedirectResponse(url="/", status_code=303)
+    with Session(engine) as session:
+        registration_enabled = get_setting(session, "registration_enabled") == "true"
     return templates.TemplateResponse(
         request,
         "login.html",
-        {"error": error, "registration_enabled": REGISTRATION_ENABLED},
+        {"error": error, "registration_enabled": registration_enabled},
     )
 
 
@@ -587,3 +608,49 @@ def admin_health_page(request: Request, current_user: User = Depends(require_adm
             "next_run": next_scrape_run(),
         },
     )
+
+
+@app.get("/admin/settings")
+def admin_settings_page(
+    request: Request,
+    saved: str = "",
+    rotated: str = "",
+    current_user: User = Depends(require_admin),
+):
+    with Session(engine) as session:
+        registration_enabled = get_setting(session, "registration_enabled") == "true"
+    flash = None
+    if saved:
+        flash = "Einstellungen gespeichert."
+    elif rotated:
+        flash = (
+            "Session-Secret wurde neu erzeugt - alle Nutzer wurden dadurch abgemeldet. "
+            "Wird erst nach einem Neustart der App aktiv."
+        )
+    return templates.TemplateResponse(
+        request,
+        "admin_settings.html",
+        {
+            "active": "admin",
+            "admin_active": "settings",
+            "current_user": current_user,
+            "registration_enabled": registration_enabled,
+            "env_secret_set": bool(os.environ.get("SESSION_SECRET_KEY")),
+            "flash": flash,
+        },
+    )
+
+
+@app.post("/admin/settings")
+async def admin_save_settings(request: Request, current_user: User = Depends(require_admin)):
+    form = await request.form()
+    with Session(engine) as session:
+        set_setting(session, "registration_enabled", "true" if form.get("registration_enabled") else "false")
+    return RedirectResponse(url="/admin/settings?saved=1", status_code=303)
+
+
+@app.post("/admin/settings/regenerate-secret")
+def admin_regenerate_secret(current_user: User = Depends(require_admin)):
+    with Session(engine) as session:
+        regenerate_session_secret(session)
+    return RedirectResponse(url="/admin/settings?rotated=1", status_code=303)

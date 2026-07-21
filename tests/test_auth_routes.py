@@ -1,3 +1,6 @@
+from sqlmodel import Session
+
+from app.db import set_setting
 from tests.conftest import register
 
 
@@ -49,8 +52,10 @@ def test_register_rejects_duplicate_email(client):
     assert resp.headers["location"] == "/register?error=taken"
 
 
-def test_registration_disabled_blocks_new_signups(client, monkeypatch):
-    monkeypatch.setattr("app.main.REGISTRATION_ENABLED", False)
+def test_registration_disabled_blocks_new_signups(client, test_engine):
+    with Session(test_engine) as session:
+        set_setting(session, "registration_enabled", "false")
+
     resp = register(client, "toolate@example.com")
     assert resp.headers["location"] == "/register"
 

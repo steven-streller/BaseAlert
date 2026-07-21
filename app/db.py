@@ -1,4 +1,5 @@
 import os
+import secrets
 
 from sqlmodel import Session, SQLModel, create_engine, select
 
@@ -32,6 +33,13 @@ STATIONS = [
 # Shared across every user - scraping the schedules isn't a per-user concern.
 GLOBAL_DEFAULT_SETTINGS = {
     "scrape_interval_minutes": "60",
+    # Read once as the initial value on first startup (same idea as
+    # BASEALERT_DB_PATH above) - after that first seed this Setting row is
+    # the source of truth and is toggled live from the admin settings page,
+    # so the env var is no longer consulted.
+    "registration_enabled": "true"
+    if os.environ.get("REGISTRATION_ENABLED", "true").lower() != "false"
+    else "false",
 }
 
 # Each user gets their own copy of these: notification channels + lead time.
@@ -108,6 +116,30 @@ def set_setting(session: Session, key: str, value: str) -> None:
     else:
         session.add(Setting(key=key, value=value))
     session.commit()
+
+
+def get_or_create_session_secret(session: Session) -> str:
+    """Persists a random session-signing secret in Settings on first run, so
+    session cookies survive restarts even without SESSION_SECRET_KEY set.
+    An explicit SESSION_SECRET_KEY env var still takes precedence - callers
+    check that first and only fall back to this (e.g. so several Kubernetes
+    replicas can share one signing key via a shared env var).
+    """
+    existing = get_setting(session, "session_secret_key")
+    if existing:
+        return existing
+    value = secrets.token_hex(32)
+    set_setting(session, "session_secret_key", value)
+    return value
+
+
+def regenerate_session_secret(session: Session) -> str:
+    """Rotates the DB-stored session secret, invalidating every existing
+    session cookie. Only takes effect after the app restarts - the signing
+    key used by the running process is fixed at startup."""
+    value = secrets.token_hex(32)
+    set_setting(session, "session_secret_key", value)
+    return value
 
 
 def get_user_setting(session: Session, user_id: int, key: str) -> str:
