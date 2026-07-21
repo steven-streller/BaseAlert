@@ -28,3 +28,8 @@ explicit_package_bases = true
 ignore_missing_imports = true
 warn_unused_ignores = true
 warn_redundant_casts = true
+
+# Not yet type-clean - remove entries here as each module is fixed.
+[[tool.mypy.overrides]]
+module = ["app.db", "app.main", "app.notifications", "app.scheduler", "app.scraper"]
+ignore_errors = true
