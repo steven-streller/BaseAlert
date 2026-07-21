@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.9](https://github.com/steven-streller/BaseAlert/compare/v0.1.8...v0.1.9) (2026-07-21)
+
+
+### Features
+
+* add admin user management and scraper health status pages ([#57](https://github.com/steven-streller/BaseAlert/issues/57)) ([d4544d8](https://github.com/steven-streller/BaseAlert/commit/d4544d86304e2f129d518f7d86358e6019ab58c9))
+
 ## [0.1.8](https://github.com/steven-streller/BaseAlert/compare/v0.1.7...v0.1.8) (2026-07-20)
 
 
