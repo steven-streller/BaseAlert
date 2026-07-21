@@ -9,6 +9,14 @@
 
 * { box-sizing: border-box; }
 
+a {
+    color: var(--accent);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+a:hover { color: var(--text); }
+
 body {
     margin: 0;
     min-height: 100vh;
@@ -409,7 +417,15 @@ details.channel[open] summary::before {
     border-radius: 8px;
     padding: 0.7rem 1rem;
     font-size: 0.9rem;
+    transition: border-color 0.15s ease;
 }
+
+.admin-user-row:hover {
+    border-color: var(--accent);
+}
+
+.link-button.danger { color: #e6a3a3; }
+.link-button.danger:hover { color: #ff6b6b; }
 
 .admin-user-main {
     display: flex;

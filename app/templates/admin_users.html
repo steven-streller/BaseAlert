@@ -34,7 +34,7 @@
                 action="/admin/users/{{ row.user.id }}/delete"
                 onsubmit="return confirm('Account {{ row.user.email }} wirklich löschen? Favoriten, Zeitfenster und Einstellungen gehen dabei verloren.');"
             >
-                <button class="link-button" type="submit">Löschen</button>
+                <button class="link-button danger" type="submit">Löschen</button>
             </form>
         </div>
         {% endif %}
