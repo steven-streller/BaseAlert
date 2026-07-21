@@ -28,3 +28,10 @@ def require_user(request: Request) -> User:
     if not user:
         raise HTTPException(status_code=303, headers={"Location": "/login", "HX-Redirect": "/login"})
     return user
+
+
+def require_admin(request: Request) -> User:
+    user = require_user(request)
+    if not user.is_admin:
+        raise HTTPException(status_code=404)
+    return user

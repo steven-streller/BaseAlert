@@ -68,9 +68,21 @@ USER_DEFAULT_SETTINGS = {
 }
 
 
+def _ensure_user_admin_column() -> None:
+    """Add `is_admin` to pre-existing `user` tables. `create_all` only creates
+    missing tables, not missing columns on tables that already exist, so
+    installs that predate the admin flag need this one-off ALTER TABLE."""
+    with engine.connect() as conn:
+        columns = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(user)").fetchall()}
+        if "is_admin" not in columns:
+            conn.exec_driver_sql("ALTER TABLE user ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT 0")
+            conn.commit()
+
+
 def init_db() -> None:
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     SQLModel.metadata.create_all(engine)
+    _ensure_user_admin_column()
     with Session(engine) as session:
         for station in STATIONS:
             existing = session.exec(select(Station).where(Station.key == station["key"])).first()

@@ -7,7 +7,7 @@ from bs4 import BeautifulSoup
 from sqlmodel import Session, select
 
 from app.db import engine
-from app.models import Dj, Show, Station
+from app.models import Dj, ScrapeStatus, Show, Station
 
 logger = logging.getLogger("basealert.scraper")
 
@@ -167,6 +167,25 @@ def scrape_station(
     return count
 
 
+def _record_scrape_status(session: Session, station: Station, count: int | None, error: str | None) -> None:
+    """Persists the outcome of a scrape attempt so the admin health page can
+    show it, independent of whether this run's log lines are still around."""
+    status = session.get(ScrapeStatus, station.id)
+    if status is None:
+        status = ScrapeStatus(station_id=station.id)
+    status.last_attempt_at = datetime.now()
+    if error is None:
+        status.last_success_at = status.last_attempt_at
+        status.last_error = None
+        status.consecutive_errors = 0
+        status.shows_scraped = count or 0
+    else:
+        status.last_error = error
+        status.consecutive_errors += 1
+    session.add(status)
+    session.commit()
+
+
 def scrape_all() -> dict:
     results = {}
     with Session(engine) as session:
@@ -175,8 +194,11 @@ def scrape_all() -> dict:
         with requests.Session() as http:
             for station in stations:
                 try:
-                    results[station.key] = scrape_station(session, station, http=http, dj_cache=dj_cache)
-                except Exception:
+                    count = scrape_station(session, station, http=http, dj_cache=dj_cache)
+                    results[station.key] = count
+                    _record_scrape_status(session, station, count, error=None)
+                except Exception as exc:
                     logger.exception("Error scraping %s", station.key)
                     results[station.key] = -1
+                    _record_scrape_status(session, station, None, error=str(exc)[:500])
     return results

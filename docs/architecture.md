@@ -18,12 +18,13 @@ einziger Container, kein separater Worker/Broker.
 | `Station` | global, fix (4 Sender) | Name, Basis-URL, Farbe |
 | `Dj` | global | DJs werden **über alle Sender hinweg per Name** dedupliziert – derselbe DJ auf zwei Sendern ist eine Zeile |
 | `Show` | global | Ein Sendeplan-Eintrag: Sender, DJ, Zeit, Show-Name, Genre |
-| `User` | pro Account | E-Mail, bcrypt-Passworthash |
+| `User` | pro Account | E-Mail, bcrypt-Passworthash, `is_admin`-Flag |
 | `Favorite` | pro Nutzer | Verknüpfung User↔Dj |
 | `ListeningWindow` | pro Nutzer | Wochentage + Zeitfenster für "jede Show benachrichtigen" |
 | `Setting` | global | Aktuell nur `scrape_interval_minutes` |
 | `UserSetting` | pro Nutzer | Benachrichtigungskanäle + Vorlaufzeit |
 | `NotificationLog` | pro Nutzer | Verhindert doppelte Benachrichtigungen für dieselbe Show |
+| `ScrapeStatus` | global, pro Sender | Letzter Scrape-Versuch/-Erfolg, letzter Fehler, Fehler-Streak – Grundlage der Admin-Statusseite |
 
 Warum DJs/Shows global, aber Favoriten/Kanäle pro Nutzer? Der Sendeplan ist
 für alle identisch (dieselben vier Sender, dieselben Shows) – das einmal zu
@@ -75,3 +76,29 @@ Kanäle sind als Daten definiert (`CHANNELS`-Dict: Label, Sendefunktion,
 Formularfelder) statt als Code pro Kanal in den Templates. Die
 Einstellungen-Seite rendert die Formulare generisch aus dieser Struktur – ein
 neuer Kanal braucht dort nur einen neuen Eintrag, keine Template-Änderung.
+
+## Admin (`/admin/users`, `/admin/health`)
+
+Der erste registrierte Account wird beim `/register` automatisch zum Admin
+(`is_admin=True`); alle danach registrierten Accounts starten ohne das Flag.
+Weitere Admins lassen sich über die Nutzerverwaltung ernennen. Die
+`require_admin`-Dependency (`app/auth.py`) gated beide Routen und antwortet
+Nicht-Admins mit 404 statt 403, um die Existenz der Seiten nicht preiszugeben.
+
+Ein Admin kann sich selbst weder demoten noch löschen (serverseitig
+erzwungen, nicht nur im UI versteckt) – das verhindert einen Zustand ohne
+verbleibenden Admin. Löschen eines Accounts entfernt dessen `Favorite`-,
+`ListeningWindow`-, `UserSetting`- und `NotificationLog`-Zeilen mit, da SQLite
+hier keine `ON DELETE CASCADE`-Fremdschlüssel hat.
+
+Da `User.is_admin` eine neue Spalte auf einer bereits existierenden Tabelle
+ist, reicht `SQLModel.metadata.create_all()` bei einem Upgrade eines
+laufenden Installs nicht aus (das legt nur fehlende *Tabellen* an, keine
+fehlenden Spalten). `init_db()` prüft deshalb per `PRAGMA table_info(user)`,
+ob die Spalte fehlt, und holt sie einmalig per `ALTER TABLE` nach.
+
+`ScrapeStatus` wird von `scrape_all()` (`app/scraper.py`) nach jedem
+Scrape-Versuch pro Sender aktualisiert: bei Erfolg `last_success_at` und
+Anzahl verarbeiteter Einträge, bei einer Exception `last_error` und ein
+Fehler-Zähler, der bei jedem weiteren Fehlversuch hochzählt und beim
+nächsten Erfolg zurückgesetzt wird.

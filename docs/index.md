@@ -43,6 +43,13 @@ Danach [Konfiguration](configuration.md) für die Referenz aller Umgebungsvariab
   gespeicherten Stand dieses Kanals eine Testbenachrichtigung schickt. Eine
   Schritt-für-Schritt-Anleitung pro Kanal gibt's unter
   [Benachrichtigungskanäle](notifications.md).
+- **Admin** – nur für Admin-Accounts sichtbar (der erste registrierte Account
+  wird automatisch zum Admin):
+    - **Nutzerverwaltung** – alle Accounts mit Anzahl Favoriten/Zeitfenster/
+      aktivierten Kanälen, weitere Admins ernennen/entziehen, Accounts löschen
+    - **Sender-Status** – letzter erfolgreicher Scrape und letzte
+      Fehlermeldung pro Sender, Anzahl Fehler in Folge, nächster geplanter
+      Lauf
 
 Registrierung ist standardmäßig offen – jeder mit Zugriff auf die URL kann
 sich einen Account anlegen. Sobald alle gewünschten Accounts existieren,

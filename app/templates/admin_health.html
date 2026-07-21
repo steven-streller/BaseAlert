@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Sender-Status - BaseAlert{% endblock %}
+{% block content %}
+<h1>Administration</h1>
+<div class="admin-subnav">
+    <a href="/admin/users" class="{{ 'active' if admin_active == 'users' else '' }}">Nutzer</a>
+    <a href="/admin/health" class="{{ 'active' if admin_active == 'health' else '' }}">Sender-Status</a>
+</div>
+
+<p class="empty">
+    Scrape-Intervall: alle {{ scrape_interval }} Minuten ·
+    {% if next_run %}nächster Lauf um {{ next_run.strftime('%d.%m. %H:%M') }} Uhr{% else %}kein Lauf geplant{% endif %}
+</p>
+
+<form method="post" action="/scrape-now">
+    <button class="secondary" type="submit">Jetzt scrapen</button>
+</form>
+
+<div class="now-playing-grid admin-health-grid">
+    {% for row in rows %}
+    <div class="now-card" style="--dot-color: {{ row.station.color }}">
+        <div class="now-station">{{ row.station.name }}</div>
+        {% if row.status and row.status.last_error %}
+            <span class="badge error">Fehler ({{ row.status.consecutive_errors }}x in Folge)</span>
+            <p class="show-name">{{ row.status.last_error }}</p>
+        {% elif row.status and row.status.last_success_at %}
+            <span class="badge on">OK</span>
+        {% else %}
+            <span class="badge">Noch nicht gescrapt</span>
+        {% endif %}
+        <p class="now-time">
+            {% if row.status and row.status.last_success_at %}
+                Letzter Erfolg: {{ row.status.last_success_at.strftime('%d.%m. %H:%M') }} Uhr
+                ({{ row.status.shows_scraped }} Einträge)
+            {% else %}
+                Letzter Erfolg: nie
+            {% endif %}
+        </p>
+        {% if row.status and row.status.last_error and row.status.last_attempt_at %}
+        <p class="now-time">Letzter Versuch: {{ row.status.last_attempt_at.strftime('%d.%m. %H:%M') }} Uhr</p>
+        {% endif %}
+        <p class="now-time">{{ row.upcoming_count }} anstehende Show{{ 's' if row.upcoming_count != 1 else '' }} in der Datenbank</p>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

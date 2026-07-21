@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Nutzerverwaltung - BaseAlert{% endblock %}
+{% block content %}
+<h1>Administration</h1>
+<div class="admin-subnav">
+    <a href="/admin/users" class="{{ 'active' if admin_active == 'users' else '' }}">Nutzer</a>
+    <a href="/admin/health" class="{{ 'active' if admin_active == 'health' else '' }}">Sender-Status</a>
+</div>
+
+{% if rows %}
+<div class="admin-table">
+    {% for row in rows %}
+    <div class="admin-user-row">
+        <div class="admin-user-main">
+            <span class="admin-user-email">{{ row.user.email }}</span>
+            {% if row.user.is_admin %}<span class="badge on">Admin</span>{% endif %}
+            {% if row.user.id == current_user.id %}<span class="badge">Du</span>{% endif %}
+        </div>
+        <span class="admin-user-meta">Seit {{ row.user.created_at.strftime('%d.%m.%Y') }}</span>
+        <span class="admin-user-meta">
+            {{ row.favorite_count }} Favorit{{ 'en' if row.favorite_count != 1 else '' }} ·
+            {{ row.window_count }} Zeitfenster ·
+            {{ row.channel_count }} Kanal{{ 'e' if row.channel_count != 1 else '' }} aktiv
+        </span>
+        {% if row.user.id != current_user.id %}
+        <div class="admin-user-actions">
+            <form method="post" action="/admin/users/{{ row.user.id }}/toggle-admin">
+                <button class="secondary" type="submit">
+                    {{ 'Admin entziehen' if row.user.is_admin else 'Zu Admin machen' }}
+                </button>
+            </form>
+            <form
+                method="post"
+                action="/admin/users/{{ row.user.id }}/delete"
+                onsubmit="return confirm('Account {{ row.user.email }} wirklich löschen? Favoriten, Zeitfenster und Einstellungen gehen dabei verloren.');"
+            >
+                <button class="link-button" type="submit">Löschen</button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<p class="empty">Keine Accounts vorhanden.</p>
+{% endif %}
+{% endblock %}

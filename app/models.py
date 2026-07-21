@@ -12,6 +12,19 @@ class Station(SQLModel, table=True):
     color: str = "#ffc600"
 
 
+class ScrapeStatus(SQLModel, table=True):
+    """Tracks the outcome of the most recent scrape attempt per station, for
+    the admin health page - separate from `Setting` since it's written by the
+    scraper on every run rather than configured by a user."""
+
+    station_id: int = Field(foreign_key="station.id", primary_key=True)
+    last_attempt_at: Optional[datetime] = None
+    last_success_at: Optional[datetime] = None
+    last_error: Optional[str] = None
+    consecutive_errors: int = 0
+    shows_scraped: int = 0
+
+
 class Dj(SQLModel, table=True):
     """A DJ is tracked globally by name, independent of which station(s) play them."""
 
@@ -37,6 +50,7 @@ class User(SQLModel, table=True):
     email: str = Field(index=True, unique=True)
     password_hash: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    is_admin: bool = Field(default=False)
 
 
 class Favorite(SQLModel, table=True):

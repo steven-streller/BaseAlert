@@ -89,6 +89,11 @@ def reschedule_scrape_job(minutes: int) -> None:
     scheduler.reschedule_job("scrape_job", trigger=IntervalTrigger(minutes=minutes))
 
 
+def next_scrape_run() -> datetime | None:
+    job = scheduler.get_job("scrape_job")
+    return job.next_run_time if job else None
+
+
 def start_scheduler() -> None:
     with Session(engine) as session:
         interval = int(get_setting(session, "scrape_interval_minutes") or 60)

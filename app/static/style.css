@@ -368,6 +368,72 @@ details.channel[open] summary::before {
     color: #111;
 }
 
+.badge.error {
+    background: #6b3030;
+    color: #e6a3a3;
+}
+
+.admin-subnav {
+    display: flex;
+    gap: 1.2rem;
+    margin-bottom: 1.2rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.admin-subnav a {
+    color: var(--text-dim);
+    text-decoration: none;
+    padding-bottom: 0.6rem;
+    border-bottom: 2px solid transparent;
+    font-size: 0.9rem;
+}
+
+.admin-subnav a.active, .admin-subnav a:hover {
+    color: var(--text);
+    border-bottom-color: var(--accent);
+}
+
+.admin-table {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.admin-user-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.6rem 1.2rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.7rem 1rem;
+    font-size: 0.9rem;
+}
+
+.admin-user-main {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+}
+
+.admin-user-meta {
+    color: var(--text-dim);
+    font-size: 0.85rem;
+}
+
+.admin-user-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    margin-left: auto;
+}
+
+.admin-health-grid {
+    margin-top: 1.2rem;
+}
+
 .channel-body {
     display: flex;
     flex-wrap: wrap;
