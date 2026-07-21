@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.10](https://github.com/steven-streller/BaseAlert/compare/v0.1.9...v0.1.10) (2026-07-21)
+
+
+### Features
+
+* use tb-group JSON showplan API as primary scrape source ([#60](https://github.com/steven-streller/BaseAlert/issues/60)) ([cfc8896](https://github.com/steven-streller/BaseAlert/commit/cfc88966daa8c9c41157382083da590479adc7e8))
+
+
+### Bug Fixes
+
+* use urlparse hostname check instead of startswith in test mocks ([#62](https://github.com/steven-streller/BaseAlert/issues/62)) ([05119b8](https://github.com/steven-streller/BaseAlert/commit/05119b8915ec49c5c87109c637fa62135ace571e))
+
 ## [0.1.9](https://github.com/steven-streller/BaseAlert/compare/v0.1.8...v0.1.9) (2026-07-21)
 
 
