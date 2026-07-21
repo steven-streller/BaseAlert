@@ -1,6 +1,7 @@
 import logging
 import re
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import requests
 from bs4 import BeautifulSoup
@@ -13,6 +14,39 @@ logger = logging.getLogger("basealert.scraper")
 
 HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; BaseAlert/1.0; +https://github.com/)"}
 DAYS_AHEAD = 6  # today + 6 following days (matches the site's own day-tab range)
+
+# tb-group's own JSON showplan API - same data the stations' HTML pages
+# render, but structured and without the DJ-id regex. Preferred source when
+# a station has a known api_id; HTML scraping (below) is the fallback for
+# when this API is unreachable or returns garbage.
+API_BASE_URL = "https://api.tb-group.fm/v1/showplan"
+BERLIN_TZ = ZoneInfo("Europe/Berlin")
+
+
+def _parse_api_events(payload: list[dict]):
+    """`s`/`e` are UTC epoch-ms; converted here to naive Europe/Berlin time
+    to match the convention every other naive Show timestamp in this app
+    uses (the container runs with TZ=Europe/Berlin, see docker-compose.yml)."""
+    for item in payload:
+        dj_name = item.get("m")
+        if not dj_name:
+            continue
+        external_id = str(item["mi"]) if item.get("mi") is not None else None
+        start_time = datetime.fromtimestamp(item["s"] / 1000, tz=BERLIN_TZ).replace(tzinfo=None)
+        end_time = None
+        if item.get("e") is not None:
+            end_time = datetime.fromtimestamp(item["e"] / 1000, tz=BERLIN_TZ).replace(tzinfo=None)
+
+        yield {
+            "dj_name": dj_name,
+            "external_id": external_id,
+            "profile_path": f"/user/beschreibung?user={external_id}" if external_id else None,
+            "show_name": item.get("n"),
+            "genre": item.get("ss"),
+            "start_time": start_time,
+            "end_time": end_time,
+            "image_url": None,
+        }
 
 
 def _parse_events(html: str):
@@ -97,6 +131,44 @@ def _get_or_create_dj(session: Session, dj_cache: dict[str, Dj], event: dict) ->
     return dj
 
 
+def _fetch_api_events(http: requests.Session, station: Station) -> list[dict]:
+    """Fetches this station's schedule from the tb-group JSON API for today
+    + DAYS_AHEAD days. Raises on the first failure so the caller falls back
+    to HTML scraping instead of persisting a partial result (day N in the
+    API is today + (N-1) days, confirmed against the stations' own sites)."""
+    events = []
+    for offset in range(DAYS_AHEAD + 1):
+        resp = http.get(
+            f"{API_BASE_URL}/{station.api_id}/{offset + 1}",
+            headers=HEADERS,
+            timeout=15,
+        )
+        resp.raise_for_status()
+        events.extend(_parse_api_events(resp.json()))
+    return events
+
+
+def _fetch_html_events(http: requests.Session, station: Station) -> list[dict]:
+    events = []
+    today = datetime.now().date()
+    for offset in range(DAYS_AHEAD + 1):
+        day = today + timedelta(days=offset)
+        day_param = day.strftime("%Y-%m-%d 00:00:00")
+        try:
+            resp = http.get(
+                f"{station.base_url}/sendeplan",
+                params={"station": station.key, "day": day_param},
+                headers=HEADERS,
+                timeout=15,
+            )
+            resp.raise_for_status()
+        except requests.RequestException as exc:
+            logger.warning("Failed to fetch %s day %s: %s", station.key, day_param, exc)
+            continue
+        events.extend(_parse_events(resp.text))
+    return events
+
+
 def scrape_station(
     session: Session,
     station: Station,
@@ -104,6 +176,11 @@ def scrape_station(
     dj_cache: dict[str, Dj] | None = None,
 ) -> int:
     """Fetch and persist the schedule for a single station.
+
+    The tb-group JSON API is the primary source for stations with a known
+    `api_id`; HTML scraping of the station's own /sendeplan page is the
+    fallback, used when the API is unreachable/malformed or the station has
+    no api_id at all.
 
     `http` and `dj_cache` can be shared across stations by the caller (see
     `scrape_all`) to reuse HTTP connections and avoid a DJ lookup query per
@@ -116,50 +193,45 @@ def scrape_station(
         dj_cache = {dj.name: dj for dj in session.exec(select(Dj)).all()}
 
     count = 0
-    today = datetime.now().date()
     existing_shows = {
         show.start_time: show
         for show in session.exec(select(Show).where(Show.station_id == station.id)).all()
     }
 
     try:
-        for offset in range(DAYS_AHEAD + 1):
-            day = today + timedelta(days=offset)
-            day_param = day.strftime("%Y-%m-%d 00:00:00")
+        events = None
+        if station.api_id:
             try:
-                resp = http.get(
-                    f"{station.base_url}/sendeplan",
-                    params={"station": station.key, "day": day_param},
-                    headers=HEADERS,
-                    timeout=15,
+                events = _fetch_api_events(http, station)
+            except (requests.RequestException, ValueError, KeyError) as exc:
+                logger.warning(
+                    "tb-group API failed for %s (%s), falling back to HTML scraping", station.key, exc
                 )
-                resp.raise_for_status()
-            except requests.RequestException as exc:
-                logger.warning("Failed to fetch %s day %s: %s", station.key, day_param, exc)
-                continue
+        if events is None:
+            events = _fetch_html_events(http, station)
 
-            for event in _parse_events(resp.text):
-                dj = _get_or_create_dj(session, dj_cache, event)
-                show = existing_shows.get(event["start_time"])
-                if show:
-                    show.dj_id = dj.id
-                    show.show_name = event["show_name"]
-                    show.genre = event["genre"]
-                    show.end_time = event["end_time"]
-                    show.image_url = event["image_url"]
-                else:
-                    show = Show(
-                        station_id=station.id,
-                        dj_id=dj.id,
-                        show_name=event["show_name"],
-                        genre=event["genre"],
-                        start_time=event["start_time"],
-                        end_time=event["end_time"],
-                        image_url=event["image_url"],
-                    )
-                    existing_shows[event["start_time"]] = show
-                session.add(show)
-                count += 1
+        for event in events:
+            dj = _get_or_create_dj(session, dj_cache, event)
+            show = existing_shows.get(event["start_time"])
+            if show:
+                show.dj_id = dj.id
+                show.show_name = event["show_name"]
+                show.genre = event["genre"]
+                show.end_time = event["end_time"]
+                show.image_url = event["image_url"]
+            else:
+                show = Show(
+                    station_id=station.id,
+                    dj_id=dj.id,
+                    show_name=event["show_name"],
+                    genre=event["genre"],
+                    start_time=event["start_time"],
+                    end_time=event["end_time"],
+                    image_url=event["image_url"],
+                )
+                existing_shows[event["start_time"]] = show
+            session.add(show)
+            count += 1
         session.commit()
     finally:
         if owns_http:

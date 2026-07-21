@@ -14,19 +14,28 @@ STATIONS = [
         "name": "TechnoBase.FM",
         "base_url": "https://www.technobase.fm",
         "color": "#ffc600",
+        "api_id": 5,
     },
     {
         "key": "housetime.fm",
         "name": "HouseTime.FM",
         "base_url": "https://www.housetime.fm",
         "color": "#00aeef",
+        "api_id": 6,
     },
-    {"key": "hardbase.fm", "name": "HardBase.FM", "base_url": "https://www.hardbase.fm", "color": "#e2001a"},
+    {
+        "key": "hardbase.fm",
+        "name": "HardBase.FM",
+        "base_url": "https://www.hardbase.fm",
+        "color": "#e2001a",
+        "api_id": 7,
+    },
     {
         "key": "trancebase.fm",
         "name": "TranceBase.FM",
         "base_url": "https://www.trancebase.fm",
         "color": "#8dc63f",
+        "api_id": 8,
     },
 ]
 
@@ -87,15 +96,36 @@ def _ensure_user_admin_column() -> None:
             conn.commit()
 
 
+def _ensure_station_api_id_column() -> None:
+    """Add `api_id` to pre-existing `station` tables and backfill it from
+    STATIONS. `create_all` only creates missing tables/columns for brand-new
+    installs - existing rows need this column added and populated so the
+    scraper can start using the tb-group JSON API without a fresh DB."""
+    with engine.connect() as conn:
+        columns = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(station)").fetchall()}
+        if "api_id" not in columns:
+            conn.exec_driver_sql("ALTER TABLE station ADD COLUMN api_id INTEGER")
+            for station in STATIONS:
+                conn.exec_driver_sql(
+                    "UPDATE station SET api_id = ? WHERE key = ?",
+                    (station["api_id"], station["key"]),
+                )
+            conn.commit()
+
+
 def init_db() -> None:
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     SQLModel.metadata.create_all(engine)
     _ensure_user_admin_column()
+    _ensure_station_api_id_column()
     with Session(engine) as session:
         for station in STATIONS:
             existing = session.exec(select(Station).where(Station.key == station["key"])).first()
             if not existing:
                 session.add(Station(**station))
+            elif existing.api_id != station["api_id"]:
+                existing.api_id = station["api_id"]
+                session.add(existing)
         for key, value in GLOBAL_DEFAULT_SETTINGS.items():
             existing = session.exec(select(Setting).where(Setting.key == key)).first()
             if not existing:

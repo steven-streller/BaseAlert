@@ -10,6 +10,10 @@ class Station(SQLModel, table=True):
     name: str  # e.g. "TechnoBase.FM"
     base_url: str  # e.g. "https://www.technobase.fm"
     color: str = "#ffc600"
+    # tb-group's own JSON showplan API identifies stations by a small int
+    # (unrelated to `key`/`base_url`) - None means this station has no known
+    # mapping and always uses HTML scraping.
+    api_id: Optional[int] = None
 
 
 class ScrapeStatus(SQLModel, table=True):
