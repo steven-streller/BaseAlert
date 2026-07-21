@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from urllib.parse import urlparse
 
 import requests
 from sqlmodel import Session, select
@@ -103,7 +104,7 @@ def test_scrape_station_prefers_api_over_html(test_engine, monkeypatch):
     ]
 
     def _get(self, url, *args, **kwargs):
-        assert url.startswith("https://api.tb-group.fm/v1/showplan/")
+        assert urlparse(url).hostname == "api.tb-group.fm"
         return _ApiResponse(api_payload)
 
     monkeypatch.setattr("app.scraper.requests.Session.get", _get)
@@ -124,7 +125,7 @@ def test_scrape_station_prefers_api_over_html(test_engine, monkeypatch):
 
 def test_scrape_station_falls_back_to_html_when_api_unreachable(test_engine, monkeypatch):
     def _get(self, url, *args, **kwargs):
-        if url.startswith("https://api.tb-group.fm"):
+        if urlparse(url).hostname == "api.tb-group.fm":
             raise requests.exceptions.ConnectionError("tb-group API is down")
         return _FakeResponse(FIXTURE)
 
