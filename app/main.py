@@ -454,7 +454,10 @@ async def save_settings(request: Request, current_user: User = Depends(require_u
             reschedule_scrape_job(scrape_interval)
         elif section in CHANNELS:
             set_user_setting(
-                session, current_user.id, f"{section}_enabled", "true" if form.get(f"{section}_enabled") else "false"
+                session,
+                current_user.id,
+                f"{section}_enabled",
+                "true" if form.get(f"{section}_enabled") else "false",
             )
             for key in CHANNELS[section]["keys"]:
                 if key in CHANNEL_CHECKBOX_FIELDS:

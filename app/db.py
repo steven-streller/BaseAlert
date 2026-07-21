@@ -8,10 +8,25 @@ DB_PATH = os.environ.get("BASEALERT_DB_PATH", "/app/data/basealert.db")
 engine = create_engine(f"sqlite:///{DB_PATH}", connect_args={"check_same_thread": False})
 
 STATIONS = [
-    {"key": "technobase.fm", "name": "TechnoBase.FM", "base_url": "https://www.technobase.fm", "color": "#ffc600"},
-    {"key": "housetime.fm", "name": "HouseTime.FM", "base_url": "https://www.housetime.fm", "color": "#00aeef"},
+    {
+        "key": "technobase.fm",
+        "name": "TechnoBase.FM",
+        "base_url": "https://www.technobase.fm",
+        "color": "#ffc600",
+    },
+    {
+        "key": "housetime.fm",
+        "name": "HouseTime.FM",
+        "base_url": "https://www.housetime.fm",
+        "color": "#00aeef",
+    },
     {"key": "hardbase.fm", "name": "HardBase.FM", "base_url": "https://www.hardbase.fm", "color": "#e2001a"},
-    {"key": "trancebase.fm", "name": "TranceBase.FM", "base_url": "https://www.trancebase.fm", "color": "#8dc63f"},
+    {
+        "key": "trancebase.fm",
+        "name": "TranceBase.FM",
+        "base_url": "https://www.trancebase.fm",
+        "color": "#8dc63f",
+    },
 ]
 
 # Shared across every user - scraping the schedules isn't a per-user concern.
