@@ -1,4 +1,4 @@
-<div class="dj-row" id="dj-row-{{ dj.id }}">
+<div class="dj-row {{ 'favorite' if is_favorite else '' }}" id="dj-row-{{ dj.id }}">
     <div class="dj-name">{{ dj.name }}</div>
     <div class="dj-stations">
         {% for station in stations %}

@@ -5,6 +5,7 @@
     --text: #e8e9ed;
     --text-dim: #9a9fae;
     --accent: #ffc600;
+    color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -254,13 +255,27 @@ h2 { font-size: 1.1rem; color: var(--text-dim); margin-top: 2rem; }
     gap: 0.6rem;
 }
 
+.dj-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
 .dj-row {
     display: flex;
     align-items: center;
     gap: 0.8rem;
     padding: 0.6rem 1rem;
-    border-bottom: 1px solid var(--border);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-left: 3px solid transparent;
+    border-radius: 8px;
+    transition: border-color 0.15s ease;
 }
+
+.dj-row:hover { border-color: var(--accent); }
+
+.dj-row.favorite { border-left-color: var(--accent); }
 
 .dj-row .dj-name { flex: 1; }
 
@@ -310,7 +325,8 @@ form.settings-form label {
 form.settings-form input[type=text],
 form.settings-form input[type=email],
 form.settings-form input[type=password],
-form.settings-form input[type=number] {
+form.settings-form input[type=number],
+form.settings-form input[type=time] {
     background: var(--bg);
     border: 1px solid var(--border);
     color: var(--text);
