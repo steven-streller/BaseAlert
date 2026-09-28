@@ -22,7 +22,7 @@ ENV TZ=Europe/Berlin \
 
 WORKDIR /app
 
-RUN apk add --no-cache tzdata=2026b-r0
+RUN apk add --no-cache tzdata
 
 # Matches the UID/GID many clusters enforce for non-root pods (e.g. via
 # PodSecurityStandards or a runAsUser policy). Without a matching /etc/passwd
