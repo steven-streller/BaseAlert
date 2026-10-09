@@ -366,8 +366,8 @@ einen Agent, der die Container-Logs nach Loki schickt.
 ## Image
 
 `FROM scratch` hat weder Zertifikate noch Zeitzonendaten noch eine Shell. Das Image enthält deshalb genau
-drei Dinge: das Binary, die CA-Zertifikate und ein leeres Verzeichnis `/data` für die State-Datei. Die
-Zeitzonendaten stecken im Binary, der Healthcheck ist ein Unterkommando.
+drei Dinge: das Binary, die CA-Zertifikate aus dem Basis-Image und ein leeres Verzeichnis `/data` für die
+State-Datei. Die Zeitzonendaten stecken im Binary, der Healthcheck ist ein Unterkommando.
 
 Gemessen für linux/amd64 mit Go 1.27:
 
@@ -425,8 +425,28 @@ und die Zeile `image` durch `image: ghcr.io/<besitzer>/basealert:1.0.0`. Ob das 
 ist, stellst du auf GitHub in den Einstellungen des Pakets ein. Ein privates Paket braucht zum Ziehen eine
 Anmeldung, im Cluster ein `imagePullSecret`.
 
-Die Actions sind auf Commits festgelegt, nicht auf verschiebbare Tags. [Dependabot](.github/dependabot.yml)
-hält diese Festlegungen, die Go-Module und das Basis-Image im Dockerfile aktuell.
+### Festgelegte Versionen
+
+Nichts, was der Build heranzieht, steht auf einer beweglichen Version wie `latest`. Jede Änderung an einer
+Version ist damit ein Commit in diesem Repo.
+
+| Was | Wo | Festgelegt auf | Aktualisiert |
+|---|---|---|---|
+| Actions | `ci.yml` | Commit, die Version steht als Kommentar dahinter | Dependabot |
+| Go-Module | `go.mod`, `go.sum` | Version und Prüfsumme | Dependabot |
+| Basis-Image mit Go, Alpine und CA-Zertifikaten | `Dockerfile` | exakter Tag und Digest | Dependabot |
+| Go in den Tests | – | liest der Workflow aus dem Dockerfile | folgt dem Basis-Image |
+| Runner | `ci.yml` | konkrete Ubuntu-Version statt `ubuntu-latest` | von Hand |
+| buildx | `ci.yml` | exakte Version | von Hand |
+| BuildKit | `ci.yml` | exakte Version und Digest | von Hand |
+
+Das Dockerfile verzichtet aus demselben Grund auf die Zeile `# syntax=` (sie zöge das jeweils neueste
+Dockerfile-Frontend) und installiert keine Pakete nach: Die CA-Zertifikate kommen aus dem festgelegten
+Basis-Image.
+
+Zwei Grenzen: Das Runner-Image erneuert GitHub wöchentlich, festlegen lässt sich nur die Ubuntu-Version. Und
+die drei Einträge „von Hand“ kennt [Dependabot](.github/dependabot.yml) nicht, sie veralten, wenn du sie nicht
+gelegentlich anhebst. Ein Test prüft, dass alle Festlegungen erhalten bleiben.
 
 ## Entwicklung
 

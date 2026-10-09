@@ -28,10 +28,16 @@ concurrency:
   # Veröffentlichungen laufen immer zu Ende.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+# Versionen sind durchgängig festgelegt, damit sich nichts unbemerkt ändert:
+#   - Runner: ein konkretes Ubuntu statt "ubuntu-latest" (von Hand anheben)
+#   - Actions: auf einen Commit, die Version steht als Kommentar dahinter (Dependabot)
+#   - Go: genau die Version des Basis-Images im Dockerfile (Dependabot)
+#   - buildx und BuildKit: unten im Image-Job (von Hand anheben)
+
 jobs:
   test:
     name: Tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -39,7 +45,7 @@ jobs:
           persist-credentials: false
 
       # Go-Version und Build-Tags stehen nur im Dockerfile. So laufen die
-      # Tests mit genau dem, womit das Image gebaut wird.
+      # Tests mit genau dem, womit das Image gebaut wird, bis zum Patch-Stand.
       - name: Go-Version und Build-Tags aus dem Dockerfile lesen
         id: build
         run: |
@@ -79,7 +85,7 @@ jobs:
   image:
     name: Image
     needs: test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       contents: read
@@ -92,7 +98,15 @@ jobs:
         with:
           persist-credentials: false
 
+      # Ohne Angaben käme buildx aus dem Runner-Image und BuildKit vom
+      # beweglichen Tag "buildx-stable-1". Dependabot kennt diese beiden
+      # Stellen nicht, sie werden von Hand angehoben. Beim Anheben von BuildKit
+      # gehört der Digest dazu:
+      #   docker buildx imagetools inspect moby/buildkit:<version>
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        with:
+          version: v0.37.2
+          driver-opts: image=moby/buildkit:v0.33.1@sha256:cec9f139f45e93c5c69c60f8b07cfad9f43f4ef6b6a6cd917527fea5ff2e3dea
 
       - name: Image-Tags bestimmen
         id: meta

@@ -1,5 +1,10 @@
-# Die Actions im Workflow sind auf Commits festgelegt. Dependabot hält diese
-# Festlegungen aktuell, ebenso die Go-Module und das Basis-Image im Dockerfile.
+# Im Repo ist jede Version festgelegt. Dependabot schlägt Aktualisierungen vor
+# für die Actions (Commit), die Go-Module und das Basis-Image im Dockerfile
+# (Tag und Digest).
+#
+# Drei Festlegungen kennt Dependabot nicht, sie werden von Hand angehoben und
+# stehen alle in .github/workflows/ci.yml: das Runner-Image (runs-on), buildx
+# und BuildKit.
 version: 2
 updates:
   - package-ecosystem: github-actions
@@ -15,8 +20,8 @@ updates:
     schedule:
       interval: weekly
 
-  # Hebt Dependabot die Go-Version im Dockerfile an, folgt der Workflow von
-  # selbst: Er liest die Version dort aus.
+  # Hebt Dependabot das Basis-Image im Dockerfile an, folgt der Workflow von
+  # selbst: Er liest die Go-Version dort aus.
   - package-ecosystem: docker
     directory: /
     schedule:

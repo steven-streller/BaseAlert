@@ -311,9 +311,9 @@ func TestWorkflowCanReadTheDockerfile(t *testing.T) {
 		}
 	}
 
-	image := regexp.MustCompile(`(?m)^FROM .*golang:([0-9]+)\.([0-9]+)-alpine`).FindStringSubmatch(dockerfile)
+	image := regexp.MustCompile(`(?m)^FROM .*golang:([0-9]+)\.([0-9]+)\.[0-9]+-alpine`).FindStringSubmatch(dockerfile)
 	if image == nil {
-		t.Fatal("Dockerfile has no line \"FROM ... golang:<major>.<minor>-alpine\"")
+		t.Fatal("Dockerfile has no line \"FROM ... golang:<major>.<minor>.<patch>-alpine\"")
 	}
 	tags := regexp.MustCompile(`(?m)^ARG GO_TAGS=(\S+)$`).FindStringSubmatch(dockerfile)
 	if tags == nil {
@@ -351,5 +351,73 @@ func TestDependabotCoversWhatIsPinned(t *testing.T) {
 		if !slices.Contains(ecosystems, want) {
 			t.Errorf("dependabot does not update %s; pinned versions there would go stale", want)
 		}
+	}
+}
+
+// Nothing the build pulls in may float: a moving tag changes what is built
+// without any change in this repository.
+func TestVersionsArePinned(t *testing.T) {
+	dockerfile := readRepoFile(t, "Dockerfile")
+	workflow := readRepoFile(t, ".github/workflows/ci.yml")
+
+	// Base images: exact release in the tag, content fixed by the digest.
+	pinnedImage := regexp.MustCompile(`^FROM --platform=\$BUILDPLATFORM \S+:\d+\.\d+\.\d+-alpine\d+\.\d+@sha256:[0-9a-f]{64} AS \w+$`)
+	stages := 0
+	for _, line := range strings.Split(dockerfile, "\n") {
+		switch {
+		case strings.HasPrefix(line, "FROM scratch"):
+			stages++
+		case strings.HasPrefix(line, "FROM "):
+			stages++
+			if !pinnedImage.MatchString(line) {
+				t.Errorf("base image is not pinned to an exact release and a digest: %s", line)
+			}
+		case strings.HasPrefix(line, "# syntax="):
+			t.Errorf("the syntax directive pulls a floating Dockerfile frontend: %s", line)
+		case regexp.MustCompile(`\b(apk add|apt-get install|apt install)\b`).MatchString(line):
+			t.Errorf("installs whatever package version the distribution serves today: %s", strings.TrimSpace(line))
+		}
+	}
+	if stages != 2 {
+		t.Errorf("found %d build stages, want the build stage and scratch", stages)
+	}
+
+	// Runners: a concrete Ubuntu release, never "latest".
+	runners := regexp.MustCompile(`(?m)^\s*runs-on: (.+)$`).FindAllStringSubmatch(workflow, -1)
+	if len(runners) != 2 {
+		t.Errorf("found %d runs-on lines, want one per job", len(runners))
+	}
+	for _, r := range runners {
+		if !regexp.MustCompile(`^ubuntu-\d\d\.\d\d$`).MatchString(r[1]) {
+			t.Errorf("runs-on: %s is not a concrete runner image", r[1])
+		}
+	}
+
+	// Build tools: exact buildx release, BuildKit by release and digest.
+	var wf workflowFile
+	if err := yaml.Unmarshal([]byte(workflow), &wf); err != nil {
+		t.Fatal(err)
+	}
+	builders := 0
+	for _, step := range wf.Jobs["image"].Steps {
+		if !strings.HasPrefix(step.Uses, "docker/setup-buildx-action@") {
+			continue
+		}
+		builders++
+		if v, _ := step.With["version"].(string); !regexp.MustCompile(`^v\d+\.\d+\.\d+$`).MatchString(v) {
+			t.Errorf("buildx version = %q, want an exact release", step.With["version"])
+		}
+		if v, _ := step.With["driver-opts"].(string); !regexp.MustCompile(`^image=moby/buildkit:v\d+\.\d+\.\d+@sha256:[0-9a-f]{64}$`).MatchString(v) {
+			t.Errorf("BuildKit image = %q, want an exact release with its digest", step.With["driver-opts"])
+		}
+	}
+	if builders != 1 {
+		t.Errorf("found %d buildx setup steps, want 1", builders)
+	}
+
+	// The Go version handed to setup-go comes from the Dockerfile, so no
+	// second version may be written into the workflow.
+	if regexp.MustCompile(`go-version: ["']?\d`).MatchString(workflow) {
+		t.Error("the workflow hard-codes a Go version; it must come from the Dockerfile")
 	}
 }
