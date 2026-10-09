@@ -413,12 +413,19 @@ Veröffentlicht wird nach `ghcr.io/<besitzer>/basealert`, und nur bei Pushes:
 | Tag `v1.3.0-rc.1` | `1.3.0-rc.1` | `1.3.0-rc.1` |
 | Pull Request | keine, es wird nur gebaut | – |
 
-Eine Version veröffentlichst du mit einem Tag:
+Die Versions-Tags entstehen automatisch über den Workflow
+[.github/workflows/release-please.yml](.github/workflows/release-please.yml). Er läuft nach Merges auf `main`,
+berechnet aus den Commit-Meldungen die nächste SemVer-Version, erstellt Release Notes und veröffentlicht das
+GitHub Release samt Tag. Dieses Tag triggert dann den bestehenden CI-Workflow und baut die Images wie oben.
 
-```sh
-git tag v1.0.0
-git push origin v1.0.0
-```
+Damit die automatische Einordnung passt:
+
+- `feat:` hebt **Minor**
+- `fix:` hebt **Patch**
+- `BREAKING CHANGE:` (oder `feat!`/`fix!`) hebt **Major**
+
+Am einfachsten klappt das mit Squash-Merges, wenn der PR-Titel bereits als Conventional Commit formuliert ist,
+zum Beispiel `feat: add outage cooldown`.
 
 Um das fertige Image statt eines lokalen Builds zu nutzen, ersetzt du in `compose.yaml` den Abschnitt `build`
 und die Zeile `image` durch `image: ghcr.io/<besitzer>/basealert:1.0.0`. Ob das Paket öffentlich oder privat
