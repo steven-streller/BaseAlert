@@ -1,0 +1,191 @@
+name: CI
+
+# Bei jedem Push und Pull Request: Tests, dann das Image bauen.
+# Veröffentlicht wird nur bei Pushes: main ergibt den Tag "edge",
+# ein Versions-Tag wie v1.2.3 ergibt 1.2.3, 1.2 und latest.
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+-*"
+  pull_request:
+
+# Ohne ausdrückliche Angabe darf ein Job nur lesen.
+permissions:
+  contents: read
+
+# Mit ausdrücklich gewählter bash laufen die Skripte mit "pipefail": Schlägt
+# in einer Pipe ein Befehl fehl, bricht der Schritt ab, statt weiterzurechnen.
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: ci-${{ github.ref }}
+  # Ein neuer Push ersetzt den laufenden Durchlauf eines Pull Requests.
+  # Veröffentlichungen laufen immer zu Ende.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Go-Version und Build-Tags stehen nur im Dockerfile. So laufen die
+      # Tests mit genau dem, womit das Image gebaut wird.
+      - name: Go-Version und Build-Tags aus dem Dockerfile lesen
+        id: build
+        run: |
+          go=$(sed -n 's/^FROM .*golang:\([0-9.]*\)-alpine.*/\1/p' Dockerfile)
+          tags=$(sed -n 's/^ARG GO_TAGS=//p' Dockerfile)
+          if [ -z "$go" ] || [ -z "$tags" ]; then
+            echo "::error file=Dockerfile::Go-Version oder GO_TAGS im Dockerfile nicht gefunden"
+            exit 1
+          fi
+          echo "go=$go" >> "$GITHUB_OUTPUT"
+          echo "tags=$tags" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ steps.build.outputs.go }}
+
+      - name: Formatierung
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "::error::Nicht mit gofmt formatiert: $unformatted"
+            exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: Tests mit Race-Detector
+        run: go test -race ./...
+
+      - name: Tests wie im Image (ohne cgo, mit den Build-Tags)
+        env:
+          CGO_ENABLED: "0"
+          GO_TAGS: ${{ steps.build.outputs.tags }}
+        run: go test -tags "$GO_TAGS" ./...
+
+  image:
+    name: Image
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write # Image nach ghcr.io schieben
+    env:
+      # Der Build-Bericht in der Zusammenfassung reicht, das Archiv dazu nicht.
+      DOCKER_BUILD_RECORD_UPLOAD: "false"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Image-Tags bestimmen
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=edge,branch=main
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      # Die Version landet im Binary: "basealert version" und die Metrik
+      # basealert_build_info zeigen sie an.
+      - name: Version bestimmen
+        id: version
+        env:
+          RELEASE: ${{ steps.meta.outputs.version }}
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            version=$RELEASE
+          else
+            version="edge-${GITHUB_SHA::7}"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Image für amd64 bauen
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          load: true
+          provenance: false
+          tags: basealert:ci
+          build-args: VERSION=${{ steps.version.outputs.version }}
+          cache-from: type=gha
+
+      - name: Image starten und Größe prüfen
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          # Das Image soll schlank bleiben. Wer diese Grenze reißt, hat
+          # vermutlich eine schwere Abhängigkeit eingeführt.
+          BUDGET_BYTES: "10000000"
+        run: |
+          reported=$(docker run --rm basealert:ci version)
+          if [ "$reported" != "$VERSION" ]; then
+            echo "::error::Das Image meldet Version '$reported', erwartet war '$VERSION'"
+            exit 1
+          fi
+
+          # Größe des entpackten Dateisystems, unabhängig davon, wie Docker
+          # die Schichten speichert.
+          container=$(docker create basealert:ci)
+          bytes=$(docker export "$container" | wc -c)
+          docker rm "$container" > /dev/null
+
+          megabytes() { awk -v bytes="$1" 'BEGIN { printf "%.2f MB", bytes / 1000000 }'; }
+          {
+            echo "### Image"
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Version | \`$VERSION\` |"
+            echo "| Größe (linux/amd64, entpackt) | $(megabytes "$bytes") |"
+            echo "| Budget | $(megabytes "$BUDGET_BYTES") |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$bytes" -gt "$BUDGET_BYTES" ]; then
+            echo "::error::Das Image ist $(megabytes "$bytes") groß, das Budget liegt bei $(megabytes "$BUDGET_BYTES")"
+            exit 1
+          fi
+
+      - name: Bei ghcr.io anmelden
+        if: github.event_name == 'push'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Ohne QEMU: Die Build-Stage läuft nativ und cross-kompiliert, die
+      # Zielstufe kopiert nur Dateien. Bei Pull Requests wird gebaut, aber
+      # nichts veröffentlicht.
+      - name: Image für amd64 und arm64 bauen und veröffentlichen
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name == 'push' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          # Das Label "source" verknüpft das Paket auf ghcr.io mit dem Repo.
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ steps.version.outputs.version }}
+          build-args: VERSION=${{ steps.version.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

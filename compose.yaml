@@ -1,0 +1,42 @@
+# BaseAlert mit "podman compose" oder "docker compose" betreiben.
+#
+#   cp .env.example .env                               # Pushover-Zugangsdaten eintragen
+#   cp config/config.example.yaml config/config.yaml   # Favoriten und Zeitslots eintragen
+#   podman compose up -d --build
+
+services:
+  basealert:
+    build:
+      context: .
+      args:
+        VERSION: ${BASEALERT_VERSION:-dev}
+    image: basealert:${BASEALERT_VERSION:-dev}
+    container_name: basealert
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      BASEALERT_LOG_LEVEL: info
+    volumes:
+      # Das Verzeichnis mounten, nicht die einzelne Datei: Ersetzt ein Editor die
+      # Datei beim Speichern, sähe der Container sonst weiter die alte Fassung.
+      - ./config:/config:ro
+      # Merkt sich, was schon gemeldet wurde, damit ein Neustart nichts wiederholt.
+      - basealert-state:/data
+    ports:
+      # /metrics und /healthz, nur vom Host aus erreichbar.
+      - "127.0.0.1:8080:8080"
+    healthcheck:
+      # Das Image hat weder Shell noch curl, das Binary prüft sich selbst.
+      test: ["CMD", "/basealert", "health"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  basealert-state:

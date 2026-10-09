@@ -1,0 +1,6 @@
+# Zugangsdaten und die persönliche Konfiguration bleiben lokal.
+.env
+config/config.yaml
+
+# Lokal gebautes Binary
+/basealert

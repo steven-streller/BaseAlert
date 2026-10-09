@@ -1,0 +1,41 @@
+# BaseAlert-Konfiguration. Nach config.yaml kopieren und anpassen.
+# Änderungen werden beim nächsten Abruf übernommen, ein Neustart ist nicht nötig.
+# Ist die Datei fehlerhaft, bleibt die letzte gültige Fassung aktiv und es kommt eine Push.
+
+# Zeitzone für die Zeitslots und für die Uhrzeiten in der Push.
+timezone: Europe/Berlin
+
+# Abstand zwischen zwei Abrufen der Sender-API, mindestens 30s.
+poll_interval: 60s
+
+# Beobachtete Sender: TechnoBase, HouseTime, HardBase, TranceBase.
+# Ohne diese Zeile werden alle vier beobachtet.
+stations: [TechnoBase, HardBase]
+
+# Lieblings-DJs: Legt einer von ihnen auf, kommt immer eine Push.
+# Erlaubt sind Namen (Groß-/Kleinschreibung egal) und DJ-IDs. Die ID bleibt
+# gültig, wenn ein DJ sich umbenennt. Namen und IDs zeigt "basealert djs".
+favorites:
+  - BlueCore
+  - 373169        # FlyMatiks
+
+# Zeitslots: In diesen Zeiten kommt eine Push, sobald irgendein DJ live ist,
+# einmal pro Live-Block. Ein nahtloser DJ-Wechsel meldet sich nicht erneut.
+slots:
+  - days: [Fr, Sa]          # Mo Di Mi Do Fr Sa So; ohne days gilt der Slot täglich
+    from: "20:00"
+    to: "02:00"             # früher als from: der Slot läuft über Mitternacht
+    stations: [TechnoBase]  # optional; ohne stations gilt der Slot für alle beobachteten Sender
+  - days: [So]
+    from: "14:00"
+    to: "18:00"
+
+# Pushover-Einstellungen je Art der Benachrichtigung.
+# priority: -2 (lautlos) bis 1 (durchbricht Ruhezeiten); sound: leer = Standardton.
+notify:
+  favorite: { priority: 0, sound: "" }
+  slot:     { priority: 0, sound: "" }
+
+# Nach dieser Zeit ohne erfolgreichen Abruf kommt eine Push "Sender-API nicht
+# erreichbar" und bei Erholung eine zweite. 0 schaltet beide ab.
+outage_alert_after: 15m

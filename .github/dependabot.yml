@@ -1,0 +1,23 @@
+# Die Actions im Workflow sind auf Commits festgelegt. Dependabot hält diese
+# Festlegungen aktuell, ebenso die Go-Module und das Basis-Image im Dockerfile.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+
+  # Hebt Dependabot die Go-Version im Dockerfile an, folgt der Workflow von
+  # selbst: Er liest die Version dort aus.
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly

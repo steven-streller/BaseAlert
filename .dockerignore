@@ -1,0 +1,12 @@
+.git
+.gitignore
+.dockerignore
+Dockerfile
+compose.yaml
+README.md
+grafana/
+config/
+.env
+.env.*
+/basealert
+.github
